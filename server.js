@@ -96,6 +96,8 @@ class Chat {
     joinq(user, channel) {
         if (!this._validateChannel(channel))
             return user.handler.get('error')('invalid name for a channel (max 25 letters, does not contain whitespace nor @ # & !)');
+        if (!user.nick)
+            return user.handler.get('error')('please choose your nickname first');
         if (user.channels.has(channel))
             return user.handler.get('error')(`channel ${channel} already joined`);
         if (!this.channels.has(channel))
@@ -127,6 +129,8 @@ class Chat {
         this.channels.get(channel).users.forEach(function (dest) {dest.handler.get('msg')(user.nick, channel, message);});
     };
     privmsgq(user, target, message) {
+        if (!user.nick)
+            return user.handler.get('error')('please choose your nickname first');
         let findUser = (nick) => {
             for (let user of this.users) if (user.nick == nick) return user;
             return undefined;
