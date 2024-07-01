@@ -70,8 +70,14 @@
                 content.innerHTML += text+'<br/>';
                 content.scrollTop = content.scrollHeight;
             }
+            function error(text) {
+                append('<span class="error">'+text+'</span>');
+            }
+            function info(text) {
+                append('<span class="info">'+text+'</span>');
+            }
 
-            var ws = { send: () => { append('<span class="error">not connected to any server</span>');} };
+            var ws = { send: () => { error('not connected to any server</span>');} };
 
             function connect(host) {
                 ws = new WebSocket(`ws://${host}`);
@@ -157,12 +163,6 @@
 
             var currentChannel = undefined;
             function input() {
-                let error = (text) => {
-                    append('<span class="error">'+text+'</span>');
-                }
-                let info = (text) => {
-                    append('<span class="info">'+text+'</span>');
-                }
                 let split = (input, limit=-1) => {
                     separator = /\s+/g
                     const output = [];
