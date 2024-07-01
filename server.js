@@ -274,7 +274,7 @@ var protocol = new Protocol();
 
 
 const host = '0.0.0.0';
-const port = 80;
+const port = process.argv[2] || 80;
 
 const server = http.createServer(function (req, res) {
     fs.readFile('./client.html', function (err, data) {
