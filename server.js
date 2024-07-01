@@ -54,7 +54,7 @@ class Chat {
         return (message.length <= 1000) && (/^[^\f\n\r\v]+$/.test(message));
     };
     _validateReason(reason) {
-        return (reason.length <= 50) && (/^[^\f\n\r\v]+$/.test(reason));
+        return (typeof reason == 'undefined') || ((reason.length <= 50) && (/^[^\f\n\r\v]+$/.test(reason)));
     };
 
     connect(host, port) {
