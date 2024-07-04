@@ -102,7 +102,7 @@
                 ws = new WebSocket(`ws://${host}`);
                 ws.onmessage = (event) => {
                     try {
-                        //append(event.data);
+                        append(event.data);
                         let message = JSON.parse(event.data);
                         switch (message[0]) {
                             case 'version':
