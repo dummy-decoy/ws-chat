@@ -116,7 +116,6 @@ class Chat {
         user.handler.get('list')(Array.from(Array.from(this.channels.values()).filter((channel) => user.options.admin || user.channels.has(channel.name) || !channel.options.secret).map((channel) => [channel.name, {...channel.options, password: !!channel.options.password}])));
     };
     usersq(user, channel = undefined) {
-        console.log(channel);
         if (typeof channel == 'undefined') {
             if (!user.options.admin)
                 return user.handler.get('error')('insufficient privileges');
