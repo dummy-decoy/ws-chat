@@ -34,8 +34,8 @@ Command help:
 > **/leave <#channel> [<reason>]** : leave the channel. the channel is automatically destroyed when the last particiapnt leaves  
 > **/mode <#channel>** : query modes for this channel  
 > **/mode <#channel> [+|- <channel modes>] [<password>]** : set modes for this channel  
-> **/mode <#channel> <@user>&nbsp[+|- <channel user modes>]** : set modes for this user on this channel  
-> **/mode <@user>&nbsp[+|- <user modes>]** : set global modes for this user  
+> **/mode <#channel> <@user> [+|- <channel user modes>]** : set modes for this user on this channel  
+> **/mode <@user> [+|- <user modes>]** : set global modes for this user  
 > **/kick <#channel> <@user> [<reason>]** : kick a user out of a channel (requires: operator, admin)  
 > **/select <#channel>** : makes the specified channel the active channel. everything you type in the input box will be sent to this channel  
 
