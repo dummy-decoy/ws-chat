@@ -26,14 +26,14 @@ Command help:
 > **/list** : list all channels on this server  
 > **/users** : list all users on the server (requires: admin)  
 > **/users <#channel>** : list all users on the specified channel. you must have joined the channel to see the list  
-> **/join <#channel> [\<password>]** : join a channel and participate ! if the channel does not exist, it is automatically created.  
+> **/join <#channel> [\<password>]** : join a channel and participate ! if the channel does not exist, it is automatically created  
 > **/topic <#channel>** : show the current topic of the specified channel  
 > **/topic <#channel> \<topic...>** : set the topic of the specified channel  
 > **/msg <#channel> \<message...>** : send a message to the specified channel  
 > **/msg <@user> \<message...>** : send a private message to the specified user  
 > **/leave <#channel> [\<reason>]** : leave the channel. the channel is automatically destroyed when the last particiapnt leaves  
 > **/mode <#channel>** : query modes for this channel  
-> **/mode <#channel> [+|- \<channel modes>] [\<password>]** : set modes for this channel  
+> **/mode <#channel> [+|- \<channel modes>] [\<password>]** : set modes for this channel. password is only required when setting the k mode  
 > **/mode <#channel> <@user> [+|- \<channel user modes>]** : set modes for this user on this channel  
 > **/mode <@user> [+|- \<user modes>]** : set global modes for this user  
 > **/kick <#channel> <@user> [\<reason>]** : kick a user out of a channel (requires: operator, admin)  
