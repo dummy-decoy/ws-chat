@@ -41,16 +41,16 @@ Command help:
 
 Channel modes are:
 
-> **s :** : *secret*. the channel does not appear when listing channels with the /list command (except for server admnistrators)  
-> **m :** : *moderated*. only users with the +v mode enabled can talk to the channel  
-> **t :** : *limited topic*. only channel operators can change the topic of the channel  
-> **k :** :  *password (key) protected*. the channel is only accessible to people knowing the password  
+> **s** : *secret*. the channel does not appear when listing channels with the /list command (except for server admnistrators)  
+> **m** : *moderated*. only users with the +v mode enabled can talk to the channel  
+> **t** : *limited topic*. only channel operators can change the topic of the channel  
+> **k** :  *password (key) protected*. the channel is only accessible to people knowing the password  
 
 Channel specific user modes are:
 
-> **o :** : *operator*. operators have super powers onto a channel  
-> **v :** : *voiced*. voiced people are allowed to talk on moderated channels  
+> **o** : *operator*. operators have super powers onto a channel  
+> **v** : *voiced*. voiced people are allowed to talk on moderated channels  
 
 User modes are:
-> **a :** : *admin*. server administrator, better not mess with them  
-> **b :** : *bot*. complacency flag to signal a user is a bot  
+> **a** : *admin*. server administrator, better not mess with them  
+> **b** : *bot*. complacency flag to signal a user is a bot  
