@@ -19,6 +19,7 @@ Command help:
 
 > **/help** : show the help message  
 > **/connect \<host:port>** : connect to a chat server  
+> **/ident** : ask for your own identification string  
 > **/motd** : display the server message of the day  
 > **/motd \<message>** : set the server message of the day (requires: admin)  
 > **/time** : show the server local time  
@@ -39,6 +40,12 @@ Command help:
 > **/kick <#channel> <@user> [\<reason>]** : kick a user out of a channel (requires: operator, admin)  
 > **/select <#channel>** : makes the specified channel the active channel. everything you type in the input box will be sent to this channel  
 
+Differentiate users by using an extended name syntax: @nick\<#channel>\<@host:port>. example: 
+> @test  
+> @test#channel  
+> @test@195.52.74.10:25642  
+> @test#channel@195.52.74.10:25642
+                    
 Channel modes are:
 
 > **s** : *secret*. the channel does not appear when listing channels with the /list command (except for server admnistrators)  
