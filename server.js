@@ -175,7 +175,7 @@ class Chat {
             return user.handler.get('topic')(channel, this.channels.get(channel).topic);
         } else {
             let target = this.channels.get(channel);
-            if (target.options.topic && !channel.users.get(user).options.operator)
+            if (target.options.topic && !target.users.get(user).operator)
                 return user.handler.get('error')('you are not allowed to modify channel topic');
             if (!this._validateTopic(value))
                 return user.handler.get('error')('invalid topic (max 200 letters)');
@@ -226,7 +226,7 @@ class Chat {
                 return user.handler.get('error')(`channel ${channel} does not exist`);
             user.handler.get('channelmode')(channel, {...target.options, password: !!target.options.password});
         } else {
-            if (!target.users.has(user) && !target.users.get(user).operator && !user.options.admin)
+            if ((!target.users.has(user) || !target.users.get(user).operator) && !user.options.admin)
                 return user.handler.get('error')('you are not allowed to change channel modes');
             // do not trust user input to store those permissions
             if ('topic' in options) target.options.topic = !!options.topic;
@@ -253,7 +253,7 @@ class Chat {
                 return user.handler.get('error')(`channel ${channel} does not exist`);
             user.handler.get('chanusermode')(channel, dest[0].serialize(), {...target.users.get(dest), ...dest[0].options});
         } else {
-            if (!target.users.has(user) && !target.users.get(user).operator && !user.options.admin)
+            if ((!target.users.has(user) || !target.users.get(user).operator) && !user.options.admin)
                 return user.handler.get('error')('you are not allowed to change user modes on this channel');
             // do not trust user input to store those permissions
             if ('operator' in options) target.users.get(dest[0]).operator = !!options.operator;
