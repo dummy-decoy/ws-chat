@@ -7,21 +7,24 @@
                 margin: 0;
                 background-color: #aaaaaa;
             }
-            #wrapper {
-                display: flex;
-                flex-direction: column;
-                height: 100vh;
-                width: 100%;
-                overflow-y: hidden;
+            ul {
+                margin: 0;
+                padding-left: 20px;
+                padding-top: 0px;
+                padding-bottom: 5px;
             }
-            #input {
-                margin: 8px;
+            ul.server {
+                padding-top: 5px;
+                list-style-type: "\25cf";
+                color: black;
             }
-            #content {
-                margin: 8px;
-                flex-grow: 1;
-                overflow-y: scroll;
-                overflow-x: auto;
+            ul.channel {
+                list-style-type: "\25be";
+                color: black;
+            }
+            ul.user {
+                list-style-type: "\25b8";
+                color: black;
             }
 
             .error {
@@ -34,7 +37,12 @@
             }
             .wall {
                 font-weight: normal;
-                color: red;
+                color: black;
+            }
+
+            .server {
+                font-weight: bold;
+                color: black;
             }
             .user {
                 font-weight: bold;
@@ -52,7 +60,10 @@
                 color: black;
             }
         </style>
-        <script lang="javascript">
+        <script src="winbox.bundle.min.js"></script>
+    </head>
+    <body>
+        <script type="text/javascript">
             function sanitize(string) {
                 const map = {
                     '&': '&amp;',
@@ -68,21 +79,69 @@
                 return string.replace(reg, (match)=>(map[match]));
             };
 
-            var content = undefined;
-            function append(text) {
-                content.innerHTML += text+'<br/>';
-                content.scrollTop = content.scrollHeight;
-            }
-            function wall(text) {
-                append('<span class="wall">'+text+'</span>');
-            }
-            function error(text) {
-                append('<span class="error">'+text+'</span>');
-            }
-            function info(text) {
-                append('<span class="info">'+text+'</span>');
-            }
+            var input = new WinBox({
+                id: 'input-container', 
+                title: 'input', 
+                class: ['no-full','no-max','no-resize','no-close'], 
+                background: '#666', 
+                header: 23, 
+                border: 3, 
+                icon: false,
+                x: 10, y: window.innerHeight-80,
+                width: window.innerWidth-20, height: 47,
+                html: '<form action="javascript:command()" style="display:flex"><input type="text" id="message" style="flex:1" autofocus/><input type="submit" value="send" style="flex:0"/></form>',
+            });
             
+            var selector = new WinBox({
+                id: 'selector',
+                title: 'selector',
+                class: ['no-full','no-close'],
+                background: '#666',
+                header: 23, border: 3,
+                icon: false,
+                x: window.innerWidth-300, y: 10,
+                width: 290, height: window.innerHeight-100
+            });
+
+            var general = new WinBox({
+                id: 'general',
+                title: 'general',
+                class: ['no-full','no-close'],
+                background: '#666',
+                header: 23, border:3,
+                icon: false,
+                x: 10, y: 10,
+                width: window.innerWidth*50/100,
+                height: window.innerHeight*60/100
+            });
+
+            var windows = {channels: new Map(), users: new Map()};
+            var defaultAction = (command) => { error(general, 'no channel selected. use /select to set the active channel.'); };
+            var myself = undefined;
+            var ws = { send: () => { error(general, 'not connected to any server</span>');} };
+
+            function send(command, args=undefined) {
+                data = [command];
+                if (args) data.push(args);
+                ws.send(JSON.stringify(data));
+            };
+
+            function append(window, text) {
+                if (window) {
+                    window.body.innerHTML += text+'<br/>';
+                    window.body.scrollTop = window.body.scrollHeight;
+                }
+            }
+            function wall(window, text) {
+                append(window, '<span class="wall">'+text+'</span>');
+            }
+            function error(window, text) {
+                append(window, '<span class="error">'+text+'</span>');
+            }
+            function info(window, text) {
+                append(window, '<span class="info">'+text+'</span>');
+            }
+
             function channelOptionsToString(options) {
                 let result = ''
                 if (options.moderated) result += 'm';
@@ -123,11 +182,114 @@
                 if (!result) return undefined; 
                 else return result.groups;
             };
+            
+            function addServer(url) {
+                selector.body.innerHTML = `<ul id="selector-servers" class="server"><li><span class="server" onclick="general.focus()">${url}</span><ul id="selector-channels" class="channel"></ul></li></ul>`;
+            };
+            function addChannel(channel) {
+                let clnChannel = sanitize(channel)
+                document.getElementById('selector-channels').innerHTML += `<li id="selector-channel-${clnChannel}"><span class="channel" onclick="getChannelWindow('${channel}').focus()">#${clnChannel}</span><ul class="user" id="selector-channel-${clnChannel}-users"></ul</li>`;
+            };
+            function removeChannel(channel) {
+                document.getElementById('selector-channels').removeChild(document.getElementById(`selector-channel-${sanitize(channel)}`));
+            };
+            function removeAllUsers(channel) {
+                let clnChannel = sanitize(channel);
+                let parent = document.getElementById(`selector-channel-${clnChannel}-users`);
+                if (parent) {
+                    while (parent.firstChild) {
+                        parent.removeChild(parent.lastChild);
+                    }
+                }
+            }
+            function addUser(channel, user) {
+                let clnChannel = sanitize(channel);
+                let clnUser = sanitize(user.nick);
+                let parent = document.getElementById(`selector-channel-${clnChannel}-users`)
+                if (parent)
+                    parent.innerHTML += `<li id="selector-channel-${clnChannel}-user-${user.url}" title="${clnUser}@${user.url}" onclick="getUserWindow('${user.nick}', '${user.url}').focus()">${userToString(clnUser)}</span></li>`;
+            };
+            function removeUser(channel, user) {
+                let clnChannel = sanitize(channel);
+                let parent = document.getElementById(`selector-channel-${clnChannel}-users`)
+                if (parent)
+                    parent.removeChild(document.getElementById(`selector-channel-${clnChannel}-user-${user.url}`));
+            };
+            function updateUser(channel, user) {
+                parent = document.getElementById(`selector-channel-${sanitize(channel)}-user-${user.url}`)
+                if (parent)
+                    parent.innerHTML = userToString(user.nick);
+            };
 
-            var ws = { send: () => { error('not connected to any server</span>');} };
+            function createChannelWindow(channel) {
+                if (!windows.channels.has(channel)) {
+                    let subwindow = new WinBox({
+                        id: 'window-channel-'+channel,
+                        title: `#${sanitize(channel)}`,
+                        class: ['no-full'],
+                        background: '#666',
+                        header: 23, border:3,
+                        icon: false,
+                        x: 10+20*(windows.channels.size+windows.users.size+1), y: 10+20*(windows.channels.size+windows.users.size+1),
+                        width: window.innerWidth*50/100,
+                        height: window.innerHeight*60/100,
+                        onfocus: () => { selectChannel(channel); setInputFocus(); },
+                        onclose: (force) => { removeChannel(channel); windows.channels.delete(channel); send('leave',{'channel':channel, 'reason':'closed the window'}); return false; }
+                    });
+                    windows.channels.set(channel, subwindow);
+                    addChannel(channel);
+                    return subwindow;
+                } else {
+                    return windows.channels.get(sanitize(channel));
+                }
+            };
+            function createUserWindow(from, to) {
+                let target = (from.url == myself.url ? to : from);
+                let key = target.url;
+                if (!windows.users.has(key)) {
+                    let subwindow = new WinBox({
+                        id: 'window-user-'+target.url,
+                        title: '@'+sanitize(target.nick)+' ('+sanitize(target.nick)+'@'+target.url+')',
+                        class: ['no-full'],
+                        background: '#666',
+                        header: 23, border:3,
+                        icon: false,
+                        x: 10+20*(windows.channels.size+windows.users.size+1), y: 10+20*(windows.channels.size+windows.users.size+1),
+                        width: window.innerWidth*50/100,
+                        height: window.innerHeight*60/100,
+                        onfocus: () => { selectUser(target); setInputFocus(); },
+                    });
+                    windows.users.set(key, subwindow);
+                    return subwindow;
+                } else {
+                    return windows.users.get(key);
+                }
+            };
+            function getChannelWindow(channel) {
+                return windows.channels.get(sanitize(channel));
+            };
+            function getUserWindow(nick, url) {
+                if (windows.users.has(url))
+                    return windows.users.get(url);
+                else
+                    return createUserWindow(myself, {'nick': nick, 'url': url});
+            };
+            
+            function selectChannel(channel) {
+                let clnChannel = sanitize(channel)
+                defaultAction = (command) => send('msg', {'channel':clnChannel, 'content':command});
+            };
+            function selectUser(user) {
+                defaultAction = (command) => send('msg', {'user':user, 'content':command});
+            };
+            function setInputFocus() {
+                document.getElementById("message").focus();
+            };
+
 
             function connect(host) {
                 ws = new WebSocket(`ws://${host}`);
+                addServer(ws.url);
                 ws.onmessage = (event) => {
                     try {
                         //append(event.data);
@@ -136,78 +298,93 @@
                             case 'version':
                                 break;
                             case 'ident':
-                                wall(`you are identified as ${identToString(message[1])}`);
+                                myself = message[1];
+                                wall(general, `you are identified as ${identToString(message[1])}`);
                                 break;
                             case 'motd':
-                                wall(`${sanitize(message[1].content).replace('\n','<br/>')}`);
+                                wall(general, `${sanitize(message[1].content).replace('\n','<br/>')}`);
                                 break;
                             case 'time':
-                                wall(`the time on the server is ${sanitize(message[1].local)}`);
+                                wall(general, `the time on the server is ${sanitize(message[1].local)}`);
                                 break;
                             case 'nick':
-                                if (!('old' in message[1]) || !('channel' in message[1]))
-                                    append(`you are now known as ${userToString(message[1].new)}`);
-                                else if ('channel' in message[1])
-                                    append(`${channelToString(message[1].channel)}: ${userToString(message[1].old)} changed name to ${userToString(message[1].new)}`);
-                                else
-                                    append(`${userToString(message[1].old)} changed name to ${userToString(message[1].new)}`);
+                                if (!('old' in message[1]) || !('channel' in message[1])) {
+                                    append(general, `you are now known as ${userToString(message[1].new)}`);
+                                } else if ('channel' in message[1]) {
+                                    updateUser(message[1].channel, message[1].new);
+                                    append(getChannelWindow(message[1].channel)||general, `${channelToString(message[1].channel)}: ${userToString(message[1].old)} changed name to ${userToString(message[1].new)}</span>`);
+                                } else {
+                                    append(general, `${userToString(message[1].old)} changed name to ${userToString(message[1].new)}`);
+                                }
                                 break;
                             case 'list':
                                 if (message[1].channels.length)
-                                    wall(`channel list:<br>&emsp;${message[1].channels.map(([channel,options])=>channelToString(channel, options)).join('<br>&emsp;')}`);
+                                    wall(general, `channel list:<br>&emsp;${message[1].channels.map(([channel,options])=>channelToString(channel, options)).join('<br>&emsp;')}`);
                                 else
-                                    wall('channel list is empty');
+                                    wall(general, 'channel list is empty');
                                 break;
                             case 'users':
-                                if (message[1].channel)
-                                    append(`${channelToString(message[1].channel)}: user list:<br>&emsp;${message[1].users.map(([user,options])=>userToString(user, options)+' ('+identToString(user)+')').join('<br>&emsp;')}`);
-                                else
-                                    wall(`user list:<br>&emsp;${message[1].users.map(([user,options])=>userToString(user, options)+' ('+identToString(user)+')').join('<br>&emsp;')}`);
+                                if (message[1].channel) {
+                                    append(getChannelWindow(message[1].channel)||general, `${channelToString(message[1].channel)}: user list:<br>&emsp;${message[1].users.map(([user,options])=>userToString(user, options)+' ('+identToString(user)+')').join('<br>&emsp;')}`);
+                                    removeAllUsers(message[1].channel);
+                                    for (let user of message[1].users.map(([name,options])=>name)) addUser(message[1].channel, user);
+                                } else {
+                                    wall(general, `user list:<br>&emsp;${message[1].users.map(([user,options])=>userToString(user, options)+' ('+identToString(user)+')').join('<br>&emsp;')}`);
+                                }
                                 break;
                             case 'join':
-                                append(`${channelToString(message[1].channel)}: ${userToString(message[1].user)} joined the channel`);
+                                subwindow = createChannelWindow(message[1].channel);
+                                addUser(message[1].channel, message[1].user);
+                                append(subwindow, `${channelToString(message[1].channel)}: ${userToString(message[1].user)} joined the channel`);
                                 break;
                             case 'topic':
                                 if (message[1].value)
-                                    append(`${channelToString(message[1].channel)}: topic was set to "<span class="topic">${sanitize(message[1].value)}</span>"`);
+                                    append(getChannelWindow(message[1].channel)||general, `${channelToString(message[1].channel)}: topic was set to "<span class="topic">${sanitize(message[1].value)}</span>"`);
                                 else
-                                    append(`${channelToString(message[1].channel)}: topic was not set`);
+                                    append(getChannelWindow(message[1].channel)||general, `${channelToString(message[1].channel)}: topic was not set`);
                                 break;
                             case 'msg':
-                                if ('channel' in message[1])
-                                    append(`${channelToString(message[1].channel)}: ${userToString(message[1].from)}: ${sanitize(message[1].content)}`);
-                                else
-                                    append(`${userToString(message[1].from)}: ${userToString(message[1].user)}: ${sanitize(message[1].content)}`);
+                                if ('channel' in message[1]) {
+                                    append(getChannelWindow(message[1].channel)||general, `${channelToString(message[1].channel)}: ${userToString(message[1].from)}: ${sanitize(message[1].content)}`);
+                                } else {
+                                    subwindow = createUserWindow(message[1].from, message[1].user);
+                                    append(subwindow, `${userToString(message[1].from)}: ${userToString(message[1].user)}: ${sanitize(message[1].content)}`);
+                                }
                                 break;
                             case 'leave':
-                                append(`${channelToString(message[1].channel)}: ${userToString(message[1].user)} left the channel (${sanitize(message[1].reason||'no reason')})`);
+                                if (message[1].user.url == myself.url)
+                                    removeAllUsers(message[1].channel);
+                                else
+                                    removeUser(message[1].channel, message[1].user);
+                                append(getChannelWindow(message[1].channel), `${channelToString(message[1].channel)}: ${userToString(message[1].user)} left the channel (${sanitize(message[1].reason||'no reason')})`);
                                 break;
                             case 'mode':
                                 if ('channel' in message[1]) {
                                     if ('user' in message[1]) {
-                                        append(`${channelToString(message[1].channel)}: user mode for ${userToString(message[1].user)} is${userOptionstoString(message[1].options)}`);
+                                        append(getChannelWindow(message[1].channel)||general, `${channelToString(message[1].channel)}: user mode for ${userToString(message[1].user)} is${userOptionstoString(message[1].options)}`);
                                     } else {
-                                        append(`${channelToString(message[1].channel)}: channel mode is${channelOptionsToString(message[1].options)}`);
+                                        append(getChannelWindow(message[1].channel)||general, `${channelToString(message[1].channel)}: channel mode is${channelOptionsToString(message[1].options)}`);
                                     }
                                 } else if ('user' in message[1]) {
-                                    wall(`user mode for ${userToString(message[1].user)} is${userOptionstoString(message[1].options)}`);
+                                    wall(general, `user mode for ${userToString(message[1].user)} is${userOptionstoString(message[1].options)}`);
                                 }
                                 break;
                             case 'kick':
-                                append(`${channelToString(message[1].channel)}: ${userToString(message[1].user)} was kicked out of the channel (${sanitize(message[1].reason||'no reason')})`);
+                                removeUser(message[1].channel, message[1].user); 
+                                append(getChannelWindow(message[1].channel)||general, `${channelToString(message[1].channel)}: ${userToString(message[1].user)}</span> was kicked out of the channel (${sanitize(message[1].reason||'no reason')})`);
                                 break;
                             case 'error':
-                                error(`${sanitize(message[1].message)}`);
+                                error(general, `${sanitize(message[1].message)}`);
                                 break;
                         }
                     } catch (exception) {
-                        error('internal error while processing server message:<br>'+exception);
+                        error(general, 'internal error while processing server message:<br>'+exception);
                     }
                 };
             };
 
             function help() {
-                append('<span class="info">'
+                append(general, '<span class="info">'
                     + '<p>This is ws-chat (tentative name), an IRC like chat running in your browser.</p>'
                     + '<p>command help:<table>'
                     + '<tr><td style="vertical-align:top">/help</td><td>show this help message</td></tr>'
@@ -235,24 +412,23 @@
                     + '</p>'
                     + '<p>Differentiate users by using an extended name syntax: @nick&lt;#channel&gt;&lt;@host:port&gt;. example: @test @test#channel @test@195.52.74.10:25642 @test#channel@195.52.74.10:25642'
                     + '<p>Channel modes are:<table>'
-                    + '<tr><td style="vertical-align:top">s :</td><td><i>secret</i>. the channel does not appear when listing channels with the /list command (except for server admnistrators)</td></tr>'
-                    + '<tr><td style="vertical-align:top">m :</td><td><i>moderated</i>. only users with the +v mode enabled can talk to the channel</td></tr>'
-                    + '<tr><td style="vertical-align:top">t :</td><td><i>limited topic</i>. only channel operators can change the topic of the channel</td></tr>'
-                    + '<tr><td style="vertical-align:top">k :</td><td>  <i>password (key) protected</i>. the channel is only accessible to people knowing the password</td></tr>'
+                    + '<tr><td style="vertical-align:top">s&nbsp;:</td><td><i>secret</i>. the channel does not appear when listing channels with the /list command (except for server admnistrators)</td></tr>'
+                    + '<tr><td style="vertical-align:top">m&nbsp;:</td><td><i>moderated</i>. only users with the +v mode enabled can talk to the channel</td></tr>'
+                    + '<tr><td style="vertical-align:top">t&nbsp;:</td><td><i>limited topic</i>. only channel operators can change the topic of the channel</td></tr>'
+                    + '<tr><td style="vertical-align:top">k&nbsp;:</td><td><i>password (key) protected</i>. the channel is only accessible to people knowing the password</td></tr>'
                     + '</table><br/>'
                     + '<p>Channel specific user modes are:<table>'
-                    + '<tr><td style="vertical-align:top">o :</td><td><i>operator</i>. operators have super powers onto a channel</td></tr>'
-                    + '<tr><td style="vertical-align:top">v :</td><td><i>voiced</i>. voiced people are allowed to talk on moderated channels</td></tr>'
+                    + '<tr><td style="vertical-align:top">o&nbsp;:</td><td><i>operator</i>. operators have super powers onto a channel</td></tr>'
+                    + '<tr><td style="vertical-align:top">v&nbsp;:</td><td><i>voiced</i>. voiced people are allowed to talk on moderated channels</td></tr>'
                     + '</table><br/>'
                     + '<p>User modes are:<table>'
-                    + '<tr><td style="vertical-align:top">a :</td><td><i>admin</i>. server administrator, better not mess with them</td></tr>'
-                    + '<tr><td style="vertical-align:top">b :</td><td><i>bot</i>. complacency flag to signal a user is a bot</td></tr>'
+                    + '<tr><td style="vertical-align:top">a&nbsp;:</td><td><i>admin</i>. server administrator, better not mess with them</td></tr>'
+                    + '<tr><td style="vertical-align:top">b&nbsp;:</td><td><i>bot</i>. complacency flag to signal a user is a bot</td></tr>'
                     + '</table></p>'
                     + '</span>')
             }
 
-            var currentChannel = undefined;
-            function input() {
+            function command() {
                 let split = (input, limit=-1) => {
                     separator = /\s+/g
                     const output = [];
@@ -269,11 +445,6 @@
                     output.push(input.slice(finalIndex));
                     return output;
                 }
-                let send = (command, args=undefined) => {
-                    data = [command];
-                    if (args) data.push(args);
-                    ws.send(JSON.stringify(data));
-                }
 
                 let input = document.getElementById('message');
                 let command = input.value.trimEnd();
@@ -281,7 +452,7 @@
                     help();
                 } else if (command.startsWith('/connect ')) {
                     args = split(command, 2);
-                    if (args.length > 2) error('/connect: too many arguments');
+                    if (args.length > 2) error(general, '/connect: too many arguments');
                     else connect(args[1]);
                 } else if (command == '/ident') {
                     send('ident');
@@ -294,7 +465,7 @@
                     send('time');
                 } else if (command.startsWith('/nick ')) {
                     args = split(command, 2);
-                    if (args.length > 2) error('/nick: too many arguments');
+                    if (args.length > 2) error(general, '/nick: too many arguments');
                     else send('nick',{'new':args[1]});
                 } else if (command == '/list') {
                     send('list');
@@ -302,45 +473,47 @@
                     send('users');    
                 } else if (command.startsWith('/users ')) {
                     args = split(command, 2);
-                    if (args.length > 2) error('/users: too many arguments');
+                    if (args.length > 2) error(general, '/users: too many arguments');
                     else {
-                        if (!args[1].startsWith('#')) error('/users: channel expected');
+                        if (!args[1].startsWith('#')) error(general, '/users: channel expected');
                         else send('users',{'channel':args[1].slice(1)})
                     };
                 } else if (command.startsWith('/join ')) {
                     args = split(command, 3);
-                    if (args.length > 3) error('/join: too many arguments');
+                    if (args.length > 3) error(general, '/join: too many arguments');
                     else {
-                        if (!args[1].startsWith('#')) error('/join: channel expected');
+                        if (!args[1].startsWith('#')) error(general, '/join: channel expected');
                         else send('join',{'channel':args[1].slice(1), 'password':args.length>2?args[2]:undefined})
                     };
                 } else if (command.startsWith('/topic ')) {
                     args = split(command, 2);
-                    if (!args[1].startsWith('#')) error('/topic: channel expected');
+                    if (!args[1].startsWith('#')) error(general, '/topic: channel expected');
                     else send('topic',{'channel':args[1].slice(1), 'value': args.length>2?args[2]:undefined})
                 } else if (command.startsWith('/msg ')) {
                     args = split(command, 2);
-                    if (args.length<3) error('/msg: missing the message...');
+                    if (args.length<3) error(general, '/msg: missing the message...');
                     else {
                         if (args[1].startsWith('#')) send('msg', {'channel':args[1].slice(1), 'content':args[2]});
                         else if (args[1].startsWith('@')) {
                             let user = stringToUser(args[1].slice(1));
-                            if (!user) error(`/msg: malformed user specifier ${args[1].slice(1)}`);
+                            if (!user) error(general, `/msg: malformed user specifier ${args[1].slice(1)}`);
                             else send('msg', {'user':user, 'content':args[2]});
-                        } else error('/msg: channel or user expected');
+                        } else error(general, '/msg: channel or user expected');
                     }
                 } else if (command.startsWith('/leave ')) {
                     args = split(command, 2);
-                    if (!args[1].startsWith('#')) error('/leave: channel expected');
+                    if (!args[1].startsWith('#')) error(general, '/leave: channel expected');
                     else send('leave',{'channel':args[1].slice(1), 'reason': args.length>2?args[2]:undefined})
                 } else if (command.startsWith('/select ')) {
                     args = split(command, 2);
-                    if (args.length > 2) error('/select: too many arguments');
+                    if (args.length > 2) error(general, '/select: too many arguments');
                     else {
-                        if (!args[1].startsWith('#')) error('/select: channel expected');
+                        if (!args[1].startsWith('#')) error(general, '/select: channel expected');
                         else { 
-                            currentChannel = args[1].slice(1);
-                            info(`<span class="channel">#${sanitize(currentChannel)}</span> is now the active channel`);
+                            let channel = sanitize(args[1].slice(1));
+                            selectChannel(channel);
+                            let subwindow = getChannelWindow(channel); if (subwindow) subwindow.focus();
+                            info(general, `${channelToString(channel)} is now the active channel`);
                         }
                     };
                 } else if (command.startsWith('/mode ')) {
@@ -355,7 +528,7 @@
                                     else if (chr == '-') value = false;
                                     else if (chr == 'o') options.operator = value;
                                     else if (chr == 'v') options.voiced = value;
-                                    else error('/mode: unrecognized mode character');
+                                    else error(general, '/mode: unrecognized mode character');
                                 }
                             }
                             let user = stringToUser(args[2].slice(1));
@@ -377,7 +550,7 @@
                                         else if (chr == 's') options.secret = value;
                                         else if (chr == 't') options.topic = value;
                                         else if (chr == 'k') { password = true; }
-                                        else error('/mode: unrecognized mode character');
+                                        else error(general, '/mode: unrecognized mode character');
                                     }
                                 }
                             }
@@ -392,45 +565,31 @@
                                 else if (chr == '-') value = false;
                                 else if (chr == 'a') options.admin = value;
                                 else if (chr == 'b') options.bot = value;
-                                else error('/mode: unrecognized mode character');
+                                else error(general, '/mode: unrecognized mode character');
                             }
                         }
                         let user = stringToUser(args[1].slice(1));
                         if (!user) error(`/mode: malformed user specifier ${args[1].slice(1)}`);
                         else send('mode', {'user': user, 'options': args.length>2 ? options : undefined});
                     } else {
-                        error('no channel or user specified');
+                        error(general, '/mode: no channel or user specified');
                     }
                 } else if (command.startsWith('/kick ')) {
                     args = split(command, 3);
-                    if (!args[1].startsWith('#')) error('/kick: channel expected before user');
-                    else if (!args[2].startsWith('@')) error('/kick: user expected after channel');
+                    if (!args[1].startsWith('#')) error(general, '/kick: channel expected before user');
+                    else if (!args[2].startsWith('@')) error(general, '/kick: user expected after channel');
                     else send('kick',{'channel':args[1].slice(1),'user':args[2].slice(1),'reason': args.length>3?args[3]:undefined});
                 } else if (command.startsWith('/kill ')) {
                     args = split(command, 2);
-                    if (!args[2].startsWith('@')) error('/kill: user expected after channel');
+                    if (!args[2].startsWith('@')) error(general, '/kill: user expected after channel');
                     else send('kill', {'user':args[2].slice(1),'reason': args.length>3?args[3]:undefined});
                 } else {
-                    if (currentChannel) send('msg', {'channel':currentChannel, 'content':command});
-                    else error('no channel selected. use /select to set the active channel.');
+                    defaultAction(command);
                 }
                 input.value = '';
             };
 
-            window.onload = () => {
-                content = document.getElementById('content');
-                help();
-            }
+            help();
         </script>
-    </head>
-    <body>
-        <div id="wrapper">
-            <div id="input">
-                <form action="javascript:input()">
-                    <input type="text" id="message" style="width:80%" autofocus/><input type="submit" value="send"/>
-                </form>
-            </div>
-            <div id="content"></div>
-        </div>
     </body>
 </html>
