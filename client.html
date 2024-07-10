@@ -27,6 +27,11 @@
                 color: black;
             }
 
+            .time {
+                font-weight: normal;
+                font-size: x-small;
+                color: lightslategray;
+            }
             .error {
                 font-weight: bold;
                 color: red;
@@ -51,6 +56,9 @@
             .user.admin {
                 color: yellow;
             }
+            .user.self {
+                color: orange;
+            }
             .channel {
                 font-weight: bold;
                 color: blue;
@@ -64,6 +72,11 @@
     </head>
     <body>
         <script type="text/javascript">
+            function beep() {
+                var snd = new Audio('data:audio/wav;base64,UklGRsIBAABXQVZFZm10IBIAAAAHAAEAQB8AAEAfAAABAAgAAABmYWN0BAAAAJABAABkYXRhkAEAALKanZudmyoaHRwcIJydm56ZuRkeGh4ZuJmdm52dIRwcHRopmp6anpl+GR4aHhqqmp2cnKEdHRsdGTiZnpqemTgZHRsdHaGcnJ2aqhoeGh4Z/5memp6aKhodHBwhnZ2bnZm4GR4aHhm4mZ2bnZ0hHBwdGiqanpqemX8ZHhoeGqqanZycoR0dGx0ZOJmemp6ZOBkdGx0doZycnZqqGh4aHhn/mZ6anpoqGh0cHCGdnZudmbgZHhoeGbiZnZudnSEcHB0aKpqemp6Z/xkeGh4aqpqdnJyhHR0bHRk4mZ6anpk4GR0bHR2hnJydmqoaHhoeGf+ZnpqemioaHRwcIZ2dm52ZuBkeGh4ZuJmdm52dIRwcHRoqmp6anpn/GR4aHhqqmp2cnKEdHRsdGTiZnpqemTgZHRsdHaGcnJ2aqhoeGh4Zf5memp6aKhodHBwhnZ2bnZm4GR4aHhm4mZ2bnZ0hHBwdGiqanpqemf4ZHhoeGqmanZycoR0dGx0ZOJmemp6ZORkeGx0coJycnZqqGx0bHRo=');
+                snd.play();
+            }
+
             function sanitize(string) {
                 const map = {
                     '&': '&amp;',
@@ -79,17 +92,26 @@
                 return string.replace(reg, (match)=>(map[match]));
             };
 
+            var settings = JSON.parse(window.localStorage.getItem('workspace-settings'))||{
+                input:{x: 10, y: window.innerHeight-80, width: window.innerWidth-20},
+                selector: {x: window.innerWidth-300, y: 10, width: 290, height: window.innerHeight-100},
+                general:{x: 10, y: 10, width: window.innerWidth*50/100, height: window.innerHeight*60/100}
+            };
+
             var input = new WinBox({
                 id: 'input-container', 
                 title: 'input', 
-                class: ['no-full','no-max','no-resize','no-close'], 
+                class: ['no-full','no-max','no-close'], 
                 background: '#666', 
                 header: 23, 
                 border: 3, 
                 icon: false,
-                x: 10, y: window.innerHeight-80,
-                width: window.innerWidth-20, height: 47,
+                x: settings.input.x+settings.input.width>window.innerWidth-10 ? Math.max(10, window.innerWidth-settings.input.width-10) : settings.input.x, 
+                y: settings.input.y>window.innerHeight-80 ? window.innerHeight-80 : settings.input.y,
+                width: settings.input.width>window.innerWidth-20 ? window.innerWidth-20 : settings.input.width, 
+                height: 47,
                 html: '<form action="javascript:command()" style="display:flex"><input type="text" id="message" style="flex:1" autofocus/><input type="submit" value="send" style="flex:0"/></form>',
+                onresize: (width,height) => { if (height != 47) input.resize(width, 47); }
             });
             
             var selector = new WinBox({
@@ -99,8 +121,10 @@
                 background: '#666',
                 header: 23, border: 3,
                 icon: false,
-                x: window.innerWidth-300, y: 10,
-                width: 290, height: window.innerHeight-100
+                x: settings.selector.x+settings.selector.width>window.innerWidth-10 ? Math.max(10, window.innerWidth-settings.selector.width-10) : settings.selector.x, 
+                y: settings.selector.y+settings.selector.height>window.innerHeight-33 ? Math.max(10, window.innerHeight-settings.selector.height-33) : settings.selector.y,
+                width: settings.selector.width>window.innerWidth-20 ? window.innerWidth-20 : settings.selector.width, 
+                height: settings.selector.height>window.innerHeight-43 ? window.innerHeight-43 : settings.selector.height, 
             });
 
             var general = new WinBox({
@@ -110,14 +134,20 @@
                 background: '#666',
                 header: 23, border:3,
                 icon: false,
-                x: 10, y: 10,
-                width: window.innerWidth*50/100,
-                height: window.innerHeight*60/100
+                x: settings.general.x+settings.general.width>window.innerWidth-10 ? Math.max(10, window.innerWidth-settings.general.width-10) : settings.general.x, 
+                y: settings.general.y+settings.general.height>window.innerHeight-33 ? Math.max(10, window.innerHeight-settings.general.height-33) : settings.general.y,
+                width: settings.general.width>window.innerWidth-20 ? window.innerWidth-20 : settings.general.width, 
+                height: settings.general.height>window.innerHeight-43 ? window.innerHeight-43 : settings.general.height, 
             });
 
             var windows = {channels: new Map(), users: new Map()};
             var defaultAction = (command) => { error(general, 'no channel selected. use /select to set the active channel.'); };
             var myself = undefined;
+            var timeFormat = Intl.DateTimeFormat(undefined, {
+                hour: "numeric",
+                minute: "numeric",
+                hour12: false
+            });
             var ws = { send: () => { error(general, 'not connected to any server</span>');} };
 
             function send(command, args=undefined) {
@@ -128,7 +158,7 @@
 
             function append(window, text) {
                 if (window) {
-                    window.body.innerHTML += text+'<br/>';
+                    window.body.innerHTML += '<span class="time">'+timeFormat.format(new Date())+'&ensp;</span>'+text+'<br/>';
                     window.body.scrollTop = window.body.scrollHeight;
                 }
             }
@@ -173,6 +203,18 @@
                     prefix = !!all.bot?'!':'@';
                     return '<span class="user '+cls+'">'+prefix+sanitize(user.nick||'(undefined)')+(options?userOptionstoString(all):'')+'</span>';
                 }
+            };
+            function messageToString(message) {
+                msg = sanitize(message);
+                msg = msg.replace(/@([^@#&!\s]+)/, (match, p1) => { 
+                    let cls = 'user'; 
+                    if (p1 == myself.nick) { 
+                        beep(); 
+                        cls += " self";
+                    }; 
+                    return '<span class="'+cls+'">'+match+'</span>'; 
+                });
+                return msg;
             };
             function identToString(user) {
                 return '<span class="user">'+sanitize(user.nick||'(undefined)')+'@'+user.url+'</span>';
@@ -223,6 +265,12 @@
 
             function createChannelWindow(channel) {
                 if (!windows.channels.has(channel)) {
+                    let dimensions = {
+                        x: 10+20*(windows.channels.size+windows.users.size+1), 
+                        y: 10+20*(windows.channels.size+windows.users.size+1),
+                        width: window.innerWidth*50/100,
+                        height: window.innerHeight*60/100
+                    };
                     let subwindow = new WinBox({
                         id: 'window-channel-'+channel,
                         title: `#${sanitize(channel)}`,
@@ -230,9 +278,10 @@
                         background: '#666',
                         header: 23, border:3,
                         icon: false,
-                        x: 10+20*(windows.channels.size+windows.users.size+1), y: 10+20*(windows.channels.size+windows.users.size+1),
-                        width: window.innerWidth*50/100,
-                        height: window.innerHeight*60/100,
+                        x: dimensions.x+dimensions.width>window.innerWidth-10 ? Math.max(10, window.innerWidth-dimensions.width-10) : dimensions.x, 
+                        y: dimensions.y+dimensions.height>window.innerHeight-10 ? Math.max(10, window.innerHeight-dimensions.height-10) : dimensions.y,
+                        width: dimensions.width>window.innerWidth-20 ? window.innerWidth-20 : dimensions.width, 
+                        height: dimensions.height>window.innerHeight-20 ? window.innerHeight-20 : dimensions.height, 
                         onfocus: () => { selectChannel(channel); setInputFocus(); },
                         onclose: (force) => { removeChannel(channel); windows.channels.delete(channel); send('leave',{'channel':channel, 'reason':'closed the window'}); return false; }
                     });
@@ -247,6 +296,12 @@
                 let target = (from.url == myself.url ? to : from);
                 let key = target.url;
                 if (!windows.users.has(key)) {
+                    let dimensions = {
+                        x: 10+20*(windows.channels.size+windows.users.size+1), 
+                        y: 10+20*(windows.channels.size+windows.users.size+1),
+                        width: window.innerWidth*50/100,
+                        height: window.innerHeight*60/100
+                    };
                     let subwindow = new WinBox({
                         id: 'window-user-'+target.url,
                         title: '@'+sanitize(target.nick)+' ('+sanitize(target.nick)+'@'+target.url+')',
@@ -254,12 +309,14 @@
                         background: '#666',
                         header: 23, border:3,
                         icon: false,
-                        x: 10+20*(windows.channels.size+windows.users.size+1), y: 10+20*(windows.channels.size+windows.users.size+1),
-                        width: window.innerWidth*50/100,
-                        height: window.innerHeight*60/100,
+                        x: dimensions.x+dimensions.width>window.innerWidth-10 ? Math.max(10, window.innerWidth-dimensions.width-10) : dimensions.x, 
+                        y: dimensions.y+dimensions.height>window.innerHeight-10 ? Math.max(10, window.innerHeight-dimensions.height-10) : dimensions.y,
+                        width: dimensions.width>window.innerWidth-20 ? window.innerWidth-20 : dimensions.width, 
+                        height: dimensions.height>window.innerHeight-20 ? window.innerHeight-20 : dimensions.height, 
                         onfocus: () => { selectUser(target); setInputFocus(); },
                     });
                     windows.users.set(key, subwindow);
+                    beep();
                     return subwindow;
                 } else {
                     return windows.users.get(key);
@@ -309,6 +366,7 @@
                                 break;
                             case 'nick':
                                 if (!('old' in message[1]) || !('channel' in message[1])) {
+                                    myself = message[1].new;
                                     append(general, `you are now known as ${userToString(message[1].new)}`);
                                 } else if ('channel' in message[1]) {
                                     updateUser(message[1].channel, message[1].new);
@@ -345,10 +403,10 @@
                                 break;
                             case 'msg':
                                 if ('channel' in message[1]) {
-                                    append(getChannelWindow(message[1].channel)||general, `${channelToString(message[1].channel)}: ${userToString(message[1].from)}: ${sanitize(message[1].content)}`);
+                                    append(getChannelWindow(message[1].channel)||general, `${channelToString(message[1].channel)}: ${userToString(message[1].from)}: ${messageToString(message[1].content)}`);
                                 } else {
                                     subwindow = createUserWindow(message[1].from, message[1].user);
-                                    append(subwindow, `${userToString(message[1].from)}: ${userToString(message[1].user)}: ${sanitize(message[1].content)}`);
+                                    append(subwindow, `${userToString(message[1].from)}: ${userToString(message[1].user)}: ${messageToString(message[1].content)}`);
                                 }
                                 break;
                             case 'leave':
@@ -589,6 +647,14 @@
                 input.value = '';
             };
 
+            window.onbeforeunload = () => {
+                let workspace = {
+                    'input': {'x': input.x, 'y': input.y, 'width': input.width, 'height': input.height},
+                    'selector': {'x': selector.x, 'y': selector.y, 'width': selector.width, 'height': selector.height}, 
+                    'general': {'x': general.x, 'y': general.y, 'width': general.width, 'height': general.height},
+                };
+                window.localStorage.setItem('workspace-settings', JSON.stringify(workspace));
+            }
             help();
         </script>
     </body>
