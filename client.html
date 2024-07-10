@@ -148,7 +148,7 @@
                 minute: "numeric",
                 hour12: false
             });
-            var ws = { send: () => { error(general, 'not connected to any server</span>');} };
+            var ws = { send: () => { error(general, 'not connected to any server');} };
 
             function send(command, args=undefined) {
                 data = [command];
@@ -344,7 +344,6 @@
                 document.getElementById("message").focus();
             };
 
-
             function connect(host) {
                 ws = new WebSocket(`ws://${host}`);
                 addServer(ws.url);
@@ -371,7 +370,7 @@
                                     append(general, `you are now known as ${userToString(message[1].new)}`);
                                 } else if ('channel' in message[1]) {
                                     updateUser(message[1].channel, message[1].new);
-                                    append(getChannelWindow(message[1].channel)||general, `${channelToString(message[1].channel)}: ${userToString(message[1].old)} changed name to ${userToString(message[1].new)}</span>`);
+                                    append(getChannelWindow(message[1].channel)||general, `${channelToString(message[1].channel)}: ${userToString(message[1].old)} changed name to ${userToString(message[1].new)}`);
                                 } else {
                                     append(general, `${userToString(message[1].old)} changed name to ${userToString(message[1].new)}`);
                                 }
@@ -430,7 +429,7 @@
                                 break;
                             case 'kick':
                                 removeUser(message[1].channel, message[1].user); 
-                                append(getChannelWindow(message[1].channel)||general, `${channelToString(message[1].channel)}: ${userToString(message[1].user)}</span> was kicked out of the channel (${sanitize(message[1].reason||'no reason')})`);
+                                append(getChannelWindow(message[1].channel)||general, `${channelToString(message[1].channel)}: ${userToString(message[1].user)} was kicked out of the channel (${sanitize(message[1].reason||'no reason')})`);
                                 break;
                             case 'error':
                                 error(general, `${sanitize(message[1].message)}`);
