@@ -23,7 +23,12 @@
                 overflow-y: scroll;
                 overflow-x: auto;
             }
-
+            
+            .time {
+                font-weight: normal;
+                font-size: x-small;
+                color: lightslategray;
+            }
             .error {
                 font-weight: bold;
                 color: red;
@@ -36,12 +41,20 @@
                 font-weight: normal;
                 color: red;
             }
+            
+            .server {
+                font-weight: bold;
+                color: black;
+            }
             .user {
                 font-weight: bold;
                 color: green;
             }
             .user.admin {
                 color: yellow;
+            }
+            .user.self {
+                color: orange;
             }
             .channel {
                 font-weight: bold;
@@ -53,6 +66,11 @@
             }
         </style>
         <script lang="javascript">
+            function beep() {
+                var snd = new Audio('data:audio/wav;base64,UklGRsIBAABXQVZFZm10IBIAAAAHAAEAQB8AAEAfAAABAAgAAABmYWN0BAAAAJABAABkYXRhkAEAALKanZudmyoaHRwcIJydm56ZuRkeGh4ZuJmdm52dIRwcHRopmp6anpl+GR4aHhqqmp2cnKEdHRsdGTiZnpqemTgZHRsdHaGcnJ2aqhoeGh4Z/5memp6aKhodHBwhnZ2bnZm4GR4aHhm4mZ2bnZ0hHBwdGiqanpqemX8ZHhoeGqqanZycoR0dGx0ZOJmemp6ZOBkdGx0doZycnZqqGh4aHhn/mZ6anpoqGh0cHCGdnZudmbgZHhoeGbiZnZudnSEcHB0aKpqemp6Z/xkeGh4aqpqdnJyhHR0bHRk4mZ6anpk4GR0bHR2hnJydmqoaHhoeGf+ZnpqemioaHRwcIZ2dm52ZuBkeGh4ZuJmdm52dIRwcHRoqmp6anpn/GR4aHhqqmp2cnKEdHRsdGTiZnpqemTgZHRsdHaGcnJ2aqhoeGh4Zf5memp6aKhodHBwhnZ2bnZm4GR4aHhm4mZ2bnZ0hHBwdGiqanpqemf4ZHhoeGqmanZycoR0dGx0ZOJmemp6ZORkeGx0coJycnZqqGx0bHRo=');
+                snd.play();
+            }
+            
             function sanitize(string) {
                 const map = {
                     '&': '&amp;',
@@ -69,8 +87,23 @@
             };
 
             var content = undefined;
+            var defaultAction = (command) => { error(general, 'no channel selected. use /select to set the active channel.'); };
+            var myself = undefined;
+            var timeFormat = Intl.DateTimeFormat(undefined, {
+                hour: "numeric",
+                minute: "numeric",
+                hour12: false
+            });
+            var ws = { send: () => { error('not connected to any server</span>');} };
+
+            function send(command, args=undefined) {
+                data = [command];
+                if (args) data.push(args);
+                ws.send(JSON.stringify(data));
+            };
+
             function append(text) {
-                content.innerHTML += text+'<br/>';
+                content.innerHTML += '<span class="time">'+timeFormat.format(new Date())+'&ensp;</span>'+text+'<br/>';
                 content.scrollTop = content.scrollHeight;
             }
             function wall(text) {
@@ -115,6 +148,18 @@
                     return '<span class="user '+cls+'">'+prefix+sanitize(user.nick||'(undefined)')+(options?userOptionstoString(all):'')+'</span>';
                 }
             };
+            function messageToString(message) {
+                msg = sanitize(message);
+                msg = msg.replace(/@([^@#&!\s]+)/g, (match, p1) => { 
+                    let cls = 'user'; 
+                    if (p1 == myself.nick) { 
+                        beep(); 
+                        cls += " self";
+                    }; 
+                    return '<span class="'+cls+'">'+match+'</span>'; 
+                });
+                return msg;
+            };
             function identToString(user) {
                 return '<span class="user">'+sanitize(user.nick||'(undefined)')+'@'+user.url+'</span>';
             };
@@ -125,6 +170,16 @@
             };
 
             var ws = { send: () => { error('not connected to any server</span>');} };
+            function selectChannel(channel) {
+                let clnChannel = sanitize(channel)
+                defaultAction = (command) => send('msg', {'channel':clnChannel, 'content':command});
+            };
+            function selectUser(user) {
+                defaultAction = (command) => send('msg', {'user':user, 'content':command});
+            };
+            function setInputFocus() {
+                document.getElementById("message").focus();
+            };
 
             function connect(host) {
                 ws = new WebSocket(`ws://${host}`);
@@ -136,6 +191,7 @@
                             case 'version':
                                 break;
                             case 'ident':
+                            myself = message[1];
                                 wall(`you are identified as ${identToString(message[1])}`);
                                 break;
                             case 'motd':
@@ -145,12 +201,14 @@
                                 wall(`the time on the server is ${sanitize(message[1].local)}`);
                                 break;
                             case 'nick':
-                                if (!('old' in message[1]) || !('channel' in message[1]))
+                                if (!('old' in message[1]) || !('channel' in message[1])) {
+                                    myself = message[1].new;
                                     append(`you are now known as ${userToString(message[1].new)}`);
-                                else if ('channel' in message[1])
+                                } else if ('channel' in message[1]) {
                                     append(`${channelToString(message[1].channel)}: ${userToString(message[1].old)} changed name to ${userToString(message[1].new)}`);
-                                else
+                                } else {
                                     append(`${userToString(message[1].old)} changed name to ${userToString(message[1].new)}`);
+                                }
                                 break;
                             case 'list':
                                 if (message[1].channels.length)
@@ -174,10 +232,12 @@
                                     append(`${channelToString(message[1].channel)}: topic was not set`);
                                 break;
                             case 'msg':
-                                if ('channel' in message[1])
-                                    append(`${channelToString(message[1].channel)}: ${userToString(message[1].from)}: ${sanitize(message[1].content)}`);
-                                else
-                                    append(`${userToString(message[1].from)}: ${userToString(message[1].user)}: ${sanitize(message[1].content)}`);
+                                if ('channel' in message[1]) {
+                                    append(`${channelToString(message[1].channel)}: ${userToString(message[1].from)}: ${messageToString(message[1].content)}`);
+                                } else {
+                                    if (message[1].from.url != myself.url) beep();
+                                    append(`${userToString(message[1].from)}: ${userToString(message[1].user)}: ${messageToString(message[1].content)}`);
+                                }
                                 break;
                             case 'leave':
                                 append(`${channelToString(message[1].channel)}: ${userToString(message[1].user)} left the channel (${sanitize(message[1].reason||'no reason')})`);
@@ -235,23 +295,22 @@
                     + '</p>'
                     + '<p>Differentiate users by using an extended name syntax: @nick&lt;#channel&gt;&lt;@host:port&gt;. example: @test @test#channel @test@195.52.74.10:25642 @test#channel@195.52.74.10:25642'
                     + '<p>Channel modes are:<table>'
-                    + '<tr><td style="vertical-align:top">s :</td><td><i>secret</i>. the channel does not appear when listing channels with the /list command (except for server admnistrators)</td></tr>'
-                    + '<tr><td style="vertical-align:top">m :</td><td><i>moderated</i>. only users with the +v mode enabled can talk to the channel</td></tr>'
-                    + '<tr><td style="vertical-align:top">t :</td><td><i>limited topic</i>. only channel operators can change the topic of the channel</td></tr>'
-                    + '<tr><td style="vertical-align:top">k :</td><td>  <i>password (key) protected</i>. the channel is only accessible to people knowing the password</td></tr>'
+                    + '<tr><td style="vertical-align:top">s&nbsp;:</td><td><i>secret</i>. the channel does not appear when listing channels with the /list command (except for server admnistrators)</td></tr>'
+                    + '<tr><td style="vertical-align:top">m&nbsp;:</td><td><i>moderated</i>. only users with the +v mode enabled can talk to the channel</td></tr>'
+                    + '<tr><td style="vertical-align:top">t&nbsp;:</td><td><i>limited topic</i>. only channel operators can change the topic of the channel</td></tr>'
+                    + '<tr><td style="vertical-align:top">k&nbsp;:</td><td><i>password (key) protected</i>. the channel is only accessible to people knowing the password</td></tr>'
                     + '</table><br/>'
                     + '<p>Channel specific user modes are:<table>'
-                    + '<tr><td style="vertical-align:top">o :</td><td><i>operator</i>. operators have super powers onto a channel</td></tr>'
-                    + '<tr><td style="vertical-align:top">v :</td><td><i>voiced</i>. voiced people are allowed to talk on moderated channels</td></tr>'
+                    + '<tr><td style="vertical-align:top">o&nbsp;:</td><td><i>operator</i>. operators have super powers onto a channel</td></tr>'
+                    + '<tr><td style="vertical-align:top">v&nbsp;:</td><td><i>voiced</i>. voiced people are allowed to talk on moderated channels</td></tr>'
                     + '</table><br/>'
                     + '<p>User modes are:<table>'
-                    + '<tr><td style="vertical-align:top">a :</td><td><i>admin</i>. server administrator, better not mess with them</td></tr>'
-                    + '<tr><td style="vertical-align:top">b :</td><td><i>bot</i>. complacency flag to signal a user is a bot</td></tr>'
+                    + '<tr><td style="vertical-align:top">a&nbsp;:</td><td><i>admin</i>. server administrator, better not mess with them</td></tr>'
+                    + '<tr><td style="vertical-align:top">b&nbsp;:</td><td><i>bot</i>. complacency flag to signal a user is a bot</td></tr>'
                     + '</table></p>'
                     + '</span>')
             }
 
-            var currentChannel = undefined;
             function input() {
                 let split = (input, limit=-1) => {
                     separator = /\s+/g
@@ -268,11 +327,6 @@
                     }
                     output.push(input.slice(finalIndex));
                     return output;
-                }
-                let send = (command, args=undefined) => {
-                    data = [command];
-                    if (args) data.push(args);
-                    ws.send(JSON.stringify(data));
                 }
 
                 let input = document.getElementById('message');
@@ -339,8 +393,9 @@
                     else {
                         if (!args[1].startsWith('#')) error('/select: channel expected');
                         else { 
-                            currentChannel = args[1].slice(1);
-                            info(`<span class="channel">#${sanitize(currentChannel)}</span> is now the active channel`);
+                            let channel = sanitize(args[1].slice(1));
+                            selectChannel(channel);
+                            info(`${channelToString(channel)} is now the active channel`);
                         }
                     };
                 } else if (command.startsWith('/mode ')) {
@@ -411,8 +466,7 @@
                     if (!args[2].startsWith('@')) error('/kill: user expected after channel');
                     else send('kill', {'user':args[2].slice(1),'reason': args.length>3?args[3]:undefined});
                 } else {
-                    if (currentChannel) send('msg', {'channel':currentChannel, 'content':command});
-                    else error('no channel selected. use /select to set the active channel.');
+                    defaultAction(command);
                 }
                 input.value = '';
             };
