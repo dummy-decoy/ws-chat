@@ -206,7 +206,7 @@
             };
             function messageToString(message) {
                 msg = sanitize(message);
-                msg = msg.replace(/@([^@#&!\s]+)/, (match, p1) => { 
+                msg = msg.replace(/@([^@#&!\s]+)/g, (match, p1) => { 
                     let cls = 'user'; 
                     if (p1 == myself.nick) { 
                         beep(); 
@@ -314,9 +314,10 @@
                         width: dimensions.width>window.innerWidth-20 ? window.innerWidth-20 : dimensions.width, 
                         height: dimensions.height>window.innerHeight-20 ? window.innerHeight-20 : dimensions.height, 
                         onfocus: () => { selectUser(target); setInputFocus(); },
+                        onclose: (force) => { windows.users.delete(key); }
                     });
                     windows.users.set(key, subwindow);
-                    beep();
+                    if (from.url != myself.url) beep();
                     return subwindow;
                 } else {
                     return windows.users.get(key);
