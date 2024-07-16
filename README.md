@@ -24,9 +24,8 @@ Command help:
 > **/motd \<message>** : set the server message of the day (requires: admin)  
 > **/time** : show the server local time  
 > **/nick \<nickname>** : set the nickname you will be yelled at  
-> **/list** : list all channels on this server  
-> **/users** : list all users on the server (requires: admin)  
-> **/users <#channel>** : list all users on the specified channel. you must have joined the channel to see the list  
+> **/list** : list all channels on this server   
+> **/users <pattern>** : list all visible users matching the specified pattern  
 > **/join <#channel> [\<password>]** : join a channel and participate ! if the channel does not exist, it is automatically created  
 > **/topic <#channel>** : show the current topic of the specified channel  
 > **/topic <#channel> \<topic...>** : set the topic of the specified channel  
@@ -35,9 +34,10 @@ Command help:
 > **/leave <#channel> [\<reason>]** : leave the channel. the channel is automatically destroyed when the last particiapnt leaves  
 > **/mode <#channel>** : query modes for this channel  
 > **/mode <#channel> [+|- \<channel modes>] [\<password>]** : set modes for this channel. password is only required when setting the k mode  
-> **/mode <#channel> <@user> [+|- \<channel user modes>]** : set modes for this user on this channel  
-> **/mode <@user> [+|- \<user modes>]** : set global modes for this user  
-> **/kick <#channel> <@user> [\<reason>]** : kick a user out of a channel (requires: operator, admin)  
+> **/mode <#channel> <@users> [+|- \<channel user modes>]** : set modes for all matching users on this channel  
+> **/mode <@users> [+|- \<user modes>]** : set global modes for those matching users  
+> **/kick <#channel> <@users> [\<reason>]** : kick some people out of a channel (requires: operator, admin)  
+> **/wall <@users> <message...>** : send a wall notice to all matching users (requires: admin)  
 > **/select <#channel>** : makes the specified channel the active channel. everything you type in the input box will be sent to this channel  
 
 Differentiate users by using an extended name syntax: @nick\<#channel>\<@host:port>. example: 
@@ -45,6 +45,8 @@ Differentiate users by using an extended name syntax: @nick\<#channel>\<@host:po
 > @test#channel  
 > @test@195.52.74.10:25642  
 > @test#channel@195.52.74.10:25642
+
+some commands (*users*, *mode*, *kick*, *wall*) accept a wildcard pattern: the command is applied to all users matching the pattern. Wildcards are * and ?, escape a wildcard by preceding it with \\.
                     
 Channel modes are:
 
