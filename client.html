@@ -375,7 +375,7 @@
                                 wall(general, `you are identified as ${identToString(message[1])}`);
                                 break;
                             case 'motd':
-                                wall(general, `${sanitize(message[1].content).replace('\n','<br/>')}`);
+                                wall(general, `${messageToString(message[1].content).replace('\n','<br/>')}`);
                                 break;
                             case 'time':
                                 wall(general, `the time on the server is ${sanitize(message[1].local)}`);
@@ -411,7 +411,7 @@
                             case 'join':
                                 subwindow = createChannelWindow(message[1].channel);
                                 addUser(message[1].channel, message[1].user, {...message[1].user.options, ...message[1].options});
-                                append(subwindow, `${channelToString(message[1].channel)}: ${userToString(message[1].user)} joined the channel`);
+                                append(subwindow, `${channelToString(message[1].channel)}: ${userToString(message[1].user, message[1].options)} joined the channel`);
                                 break;
                             case 'topic':
                                 if (message[1].value)
@@ -454,7 +454,7 @@
                                 append(getChannelWindow(message[1].channel)||general, `${channelToString(message[1].channel)}: ${userToString(message[1].user)} was kicked out of the channel (${sanitize(message[1].reason||'no reason')})`);
                                 break;
                             case 'wall':
-                                wall(general, `${userToString(message[1].from)}: ${message[1].content}`);
+                                wall(general, `${userToString(message[1].from)}: ${messageToString(message[1].content)}`);
                                 beep();
                                 break;
                             case 'error':
