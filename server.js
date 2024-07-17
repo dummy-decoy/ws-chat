@@ -134,7 +134,7 @@ class Chat {
         } else { 
             joined.users.set(user, {...new ChannelUserOptions(), 'voiced': !joined.options.moderated});
         }
-        for (let [dest, options] of joined.users) { dest.handler.get('join')(user.serialize(), joined.name); };
+        for (let [dest, options] of joined.users) { dest.handler.get('join')(user.serialize(), joined.name, joined.users.get(user)); };
         return joined;
     };
     _cleanupChannel(user, channel) {
@@ -557,8 +557,8 @@ class Protocol {
     usermatch(pattern, users) {
         this.send(JSON.stringify(['users', {'pattern': pattern, 'match': users}]));
     };
-    join(user, channel) {
-        this.send(JSON.stringify(['join', {'user': user, 'channel': channel}]));
+    join(user, channel, options) {
+        this.send(JSON.stringify(['join', {'user': user, 'channel': channel, 'options': options}]));
     };
     topic(channel, value) {
         this.send(JSON.stringify(['topic', {'channel': channel, 'value': value}]));
