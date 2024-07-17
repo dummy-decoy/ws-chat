@@ -615,6 +615,8 @@ const server = http.createServer(function (req, res) {
         serveFile('./client.min.html');
     } else if (req.url == '/winbox.bundle.min.js') {
         serveFile('./winbox.bundle.min.js');
+    } else if (req.url == '/markdown-it.min.js') {
+        serveFile('./markdown-it.min.js');
     }else {
         res.writeHead(404, {'Content-Type': 'text/plain'});
         res.end('404: File not found');
