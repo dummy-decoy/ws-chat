@@ -8,15 +8,24 @@ const MatchResult = Object.freeze({
     FALSE: false,
     ABORT: Symbol("abort")
 });
-function match_class(chr, cls) {
-    let reversed = false;
-    if (cls[0] == '!') {
-        reversed = true;
-        cls = cls.slice(1);
+function match_class(chr, cls, reversed) {
+    let allowrange = false;
+    let first = ''; 
+    let last = '';
+    for (let p = 0; p < cls.length; p++) {
+        if (allowrange && (cls[p] == '-') && (p < cls.length-1)) {
+            last = cls[++p];
+            if ((chr >= first) && (chr <= last)) 
+                return !reversed;
+            allowrange = false;
+        } else {
+            first = cls[p];
+            if (chr == first) 
+                return !reversed;
+            allowrange = true;
+        }
     }
-    if (cls == '') return false;
-
-    
+    return reversed;
 }
 function match_pattern(string, pattern) {
     let s = 0;
@@ -60,7 +69,11 @@ function match_pattern(string, pattern) {
                 while ((q < pattern.length) && (pattern[q] != ']')) 
                     q++;
                 if (q >= pattern.length) return MatchResult.ABORT;
-                if (!match_class(string[s], pattern.slice(p, q))) return MatchResult.FALSE;
+                let reversed = (pattern[p] == '!'); 
+                if (reversed) p++;
+                if (p == q) return MatchResult.ABORT;
+                if (!match_class(string[s++], pattern.slice(p, q), reversed)) 
+                    return MatchResult.FALSE;
                 p = q;
                 break;
         }
@@ -72,24 +85,6 @@ function match_pattern(string, pattern) {
 }
 function match(string, pattern) {
     return (pattern == '*') || (match_pattern(string, pattern) == MatchResult.TRUE);
-}
-function escape(string) {
-    let escaped = '';
-    for (let chr of string) {
-        if (chr == '*')
-            escaped += '\\*';
-        else if (chr == '?')
-            escaped += '\\?';
-        else if (chr == '[')
-            escaped += '\\[';
-        else if (chr == ']')
-            escaped += '\\]';
-        else if (chr == '!')
-            escaped += '\\!';
-        else
-            escaped += chr;
-    }
-    return escaped;
 }
 
 class UserOptions {admin = false; bot = false};
