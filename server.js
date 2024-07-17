@@ -431,8 +431,6 @@ class Protocol {
 
         let user = chat.connect(ws.host, ws.port);
         this.connections.set(ws, user);
-        
-        dns.reverse(ws.host, (error, hostname)=>{ if (!error && (hostname != '')) user.url = hostname+':'+ws.port; });
 
         user.on('error', this.error.bind(ws));
         user.on('ident', this.ident.bind(ws));
@@ -455,6 +453,8 @@ class Protocol {
 
         this.version.bind(ws)();
         chat.motdq(user);
+
+        dns.reverse(ws.host, (error, hostname)=>{ if (!error && (hostname != '')) user.url = hostname+':'+ws.port; chat.identq(user); });
     };
     disconnect(ws, reason) {
         chat.disconnect(this.connections.get(ws), reason);
