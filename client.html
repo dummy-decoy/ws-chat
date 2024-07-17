@@ -181,27 +181,32 @@
 
                 if (result) return ' (+'+result+')'; else return '';
             };
-            function userOptionstoString(options) {
+            function userOptionsToString(options) {
                 let plus = '';
-                if (options.admin) plus += 'a';
-                if (options.bot) plus += 'b';
-                if (options.operator) plus += 'o';
                 let minus = '';
-                if (('voiced' in options) && !options.voiced) minus += 'v'
-
-                return ' ('+(plus?'+'+plus:'')+(minus?'-'+minus:'')+')'
+                if (options) {
+                    if (options.admin) plus += 'a';
+                    if (options.bot) plus += 'b';
+                    if (options.operator) plus += 'o';
+                    
+                    if (('voiced' in options) && !options.voiced) minus += 'v'
+                }
+                if (!plus && !minus)
+                    return '<span class="options"></span>';
+                else
+                    return '<span class="options">('+(plus?'+'+plus:'')+(minus?'-'+minus:'')+')</span>';
             };
             function channelToString(channel, options=undefined) {
                 return '<span class="channel">#'+sanitize(channel)+(options?channelOptionsToString(options):'')+'</span>';
             };
             function userToString(user, options=undefined) {
                 if (typeof user == 'string')
-                    return '<span class="user">@'+sanitize(user)+(options?userOptionstoString(options):'')+'</span>';
+                    return '<span class="user">@'+sanitize(user)+'</span>'+' '+userOptionsToString(options);
                 else {
                     all = {...user.options, ...options}
                     cls = !!all.admin?'admin':'';
                     prefix = !!all.bot?'!':'@';
-                    return '<span class="user '+cls+'">'+prefix+sanitize(user.nick||'(undefined)')+(options?userOptionstoString(all):'')+'</span>';
+                    return '<span class="user '+cls+'">'+prefix+sanitize(user.nick||'(undefined)')+' '+userOptionsToString(all)+'</span>';
                 }
             };
             function messageToString(message) {
@@ -247,12 +252,12 @@
                     }
                 }
             }
-            function addUser(channel, user) {
+            function addUser(channel, user, options=undefined) {
                 let clnChannel = sanitize(channel);
                 let clnUser = sanitize(user.nick);
                 let parent = document.getElementById(`selector-channel-${clnChannel}-users`)
                 if (parent)
-                    parent.innerHTML += `<li id="selector-channel-${clnChannel}-user-${user.url}" title="${clnUser}@${user.url}" onclick="getUserWindow('${user.nick}', '${user.url}').focus()">${userToString(clnUser)}</span></li>`;
+                    parent.innerHTML += `<li id="selector-channel-${clnChannel}-user-${user.url}" title="${clnUser}@${user.url}" onclick="getUserWindow('${user.nick}', '${user.url}').focus()">${userToString(clnUser, options)}</li>`;
             };
             function removeUser(channel, user) {
                 let clnChannel = sanitize(channel);
@@ -260,10 +265,16 @@
                 if (parent)
                     parent.removeChild(document.getElementById(`selector-channel-${clnChannel}-user-${user.url}`));
             };
-            function updateUser(channel, user) {
+            function updateUser(channel, user, options=undefined) {
                 parent = document.getElementById(`selector-channel-${sanitize(channel)}-user-${user.url}`)
-                if (parent)
-                    parent.innerHTML = userToString(user.nick);
+                if (parent) {
+                    parent.removeChild(parent.firstChild);
+                    parent.insertAdjacentHTML('afterbegin', userToString(user.nick));
+                    if (options) {
+                        parent.removeChild(parent.lastChild)
+                        parent.insertAdjacentHTML('beforeend', userOptionsToString(options));
+                    }
+                }
             };
 
             function createChannelWindow(channel) {
@@ -388,16 +399,16 @@
                                 if (message[1].channel) {
                                     append(getChannelWindow(message[1].channel)||general, `${channelToString(message[1].channel)}: user list:<br>&emsp;${message[1].users.map(([user,options])=>userToString(user, options)+' ('+identToString(user)+')').join('<br>&emsp;')}`);
                                     removeAllUsers(message[1].channel);
-                                    for (let user of message[1].users.map(([name,options])=>name)) addUser(message[1].channel, user);
+                                    for (let [user, options] of message[1].users) addUser(message[1].channel, user, options);
                                 } else if (message[1].pattern) {
-                                    wall(general, `users matching ${patternToString(message[1].pattern)}:<br>&emsp;${message[1].match.map(([user,options,channels])=>userToString(user, options)+' ('+identToString(user)+') '+channels.map(([channel, options])=>channelToString(channel)+':'+userOptionstoString(options)).join(' ')).join('<br>&emsp;')}`);
+                                    wall(general, `users matching ${patternToString(message[1].pattern)}:<br>&emsp;${message[1].match.map(([user,options,channels])=>userToString(user, options)+' ('+identToString(user)+') '+channels.map(([channel, options])=>channelToString(channel)+userOptionsToString(options)).join(' ')).join('<br>&emsp;')}`);
                                 } else {
                                     wall(general, `user list:<br>&emsp;${message[1].users.map(([user,options])=>userToString(user, options)+' ('+identToString(user)+')').join('<br>&emsp;')}`);
                                 }
                                 break;
                             case 'join':
                                 subwindow = createChannelWindow(message[1].channel);
-                                addUser(message[1].channel, message[1].user);
+                                addUser(message[1].channel, message[1].user, {...message[1].user.options, ...message[1].options});
                                 append(subwindow, `${channelToString(message[1].channel)}: ${userToString(message[1].user)} joined the channel`);
                                 break;
                             case 'topic':
@@ -424,12 +435,13 @@
                             case 'mode':
                                 if ('channel' in message[1]) {
                                     if ('user' in message[1]) {
-                                        append(getChannelWindow(message[1].channel)||general, `${channelToString(message[1].channel)}: user mode for ${userToString(message[1].user)} is${userOptionstoString(message[1].options)}`);
+                                        append(getChannelWindow(message[1].channel)||general, `${channelToString(message[1].channel)}: user mode for ${userToString(message[1].user)} is ${userOptionsToString(message[1].options)||'(-)'}`);
+                                        updateUser(message[1].channel, message[1].user, {...message[1].user.options, ...message[1].options});
                                     } else {
                                         append(getChannelWindow(message[1].channel)||general, `${channelToString(message[1].channel)}: channel mode is${channelOptionsToString(message[1].options)}`);
                                     }
                                 } else if ('user' in message[1]) {
-                                    wall(general, `user mode for ${userToString(message[1].user)} is${userOptionstoString(message[1].options)}`);
+                                    wall(general, `user mode for ${userToString(message[1].user)} is (${userOptionsToString(message[1].options)||'(-)'})`);
                                 }
                                 break;
                             case 'kick':
