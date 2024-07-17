@@ -69,6 +69,7 @@
             }
         </style>
         <script src="winbox.bundle.min.js"></script>
+        <script src="markdown-it.min.js"></script>
     </head>
     <body>
         <script type="text/javascript">
@@ -149,6 +150,7 @@
                 hour12: false
             });
             var ws = { send: () => { error(general, 'not connected to any server');} };
+            var md = window.markdownit({html: false, xhtmlOut: true, breaks: true, linkify: true, typographer: false});
 
             function send(command, args=undefined) {
                 data = [command];
@@ -206,11 +208,11 @@
                     all = {...user.options, ...options}
                     cls = !!all.admin?'admin':'';
                     prefix = !!all.bot?'!':'@';
-                    return '<span class="user '+cls+'">'+prefix+sanitize(user.nick||'(undefined)')+(options?' '+userOptionsToString(all):'')+'</span>';
+                    return '<span class="user '+cls+'">'+prefix+sanitize(user.nick||'(undefined)')+' '+userOptionsToString(all)+'</span>';
                 }
             };
             function messageToString(message) {
-                msg = sanitize(message);
+                let msg =  md.renderInline(message);
                 msg = msg.replace(/@([^@#&!\s]+)/g, (match, p1) => { 
                     let cls = 'user'; 
                     if (p1 == myself.nick) { 
