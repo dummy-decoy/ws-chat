@@ -13,6 +13,9 @@ The server listens to **port 80** by default. However, you can change this port 
 
 You can now open a browser and browse to the url of the server, the server will display the client interface.
 
+## Client interface
+![ws-chat screenshot](ws-chat-screenshot.png)
+
 ## Using the chat
 
 Command help:
