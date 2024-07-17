@@ -206,7 +206,7 @@
                     all = {...user.options, ...options}
                     cls = !!all.admin?'admin':'';
                     prefix = !!all.bot?'!':'@';
-                    return '<span class="user '+cls+'">'+prefix+sanitize(user.nick||'(undefined)')+' '+userOptionsToString(all)+'</span>';
+                    return '<span class="user '+cls+'">'+prefix+sanitize(user.nick||'(undefined)')+(options?' '+userOptionsToString(all):'')+'</span>';
                 }
             };
             function messageToString(message) {
