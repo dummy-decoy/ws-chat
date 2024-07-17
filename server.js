@@ -1,7 +1,7 @@
 const http = require('http');
+const dns = require('dns');
 const ws = require('ws');
 const fs = require('fs');
-const { resolveObjectURL } = require('buffer');
 
 const MatchResult = Object.freeze({
     TRUE:  true,
@@ -432,6 +432,8 @@ class Protocol {
         let user = chat.connect(ws.host, ws.port);
         this.connections.set(ws, user);
         
+        dns.reverse(ws.host, (error, hostname)=>{ if (!error && (hostname != '')) user.url = hostname+':'+ws.port; });
+
         user.on('error', this.error.bind(ws));
         user.on('ident', this.ident.bind(ws));
         user.on('time', this.time.bind(ws));
@@ -452,7 +454,6 @@ class Protocol {
         user.on('wall', this.wall.bind(ws));
 
         this.version.bind(ws)();
-        chat.identq(user);
         chat.motdq(user);
     };
     disconnect(ws, reason) {
