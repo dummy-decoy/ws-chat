@@ -63,3 +63,5 @@ Channel specific user modes are:
 User modes are:
 > **a** : *admin*. server administrator, better not mess with them  
 > **b** : *bot*. complacency flag to signal a user is a bot  
+
+You can use [Markdown](https://commonmark.org/help/) to format messages
