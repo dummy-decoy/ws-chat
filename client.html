@@ -443,7 +443,7 @@
                                         append(getChannelWindow(message[1].channel)||general, `${channelToString(message[1].channel)}: channel mode is${channelOptionsToString(message[1].options)}`);
                                     }
                                 } else if ('user' in message[1]) {
-                                    wall(general, `user mode for ${userToString(message[1].user)} is (${userOptionsToString(message[1].options)||'(-)'})`);
+                                    wall(general, `user mode for ${userToString(message[1].user)} is ${userOptionsToString(message[1].options)||'(-)'}`);
                                 }
                                 break;
                             case 'kick':
