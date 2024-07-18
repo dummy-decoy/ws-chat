@@ -124,6 +124,7 @@ class Chat {
     motd = 'Welcome to the server !';
     users = new Set();
     channels = new Map();
+    autoadmin = process.argv[3] || '';
     
     _joinChannel(user, channel) {
         let joined = this.channels.get(channel);
@@ -198,6 +199,7 @@ class Chat {
 
     connect(host, port) {
         let user = new User(`${host}:${port}`);
+        if (match(user.url, this.autoadmin)) user.options.admin = true;
         this.users.add(user);
         console.log(`${user.nick}@${user.url} connected`);
         return user;
