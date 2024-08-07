@@ -1,6 +1,8 @@
 # ws-chat
 An IRC like online chat running in your web browser using WebSockets
 
+**A live demo is accessible here: [http://orwell.home.stochastique.net:5000/](http://orwell.home.stochastique.net:5000/)**
+
 ## Running the chat server
 
 The chat server runs with node.js. After [installing node](https://nodejs.org/en/download/package-manager), execute the server by typing on a command line:
