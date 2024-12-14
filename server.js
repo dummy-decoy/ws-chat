@@ -1,3 +1,5 @@
+#!/usr/bin/env node
+
 const http = require('http');
 const dns = require('dns');
 const ws = require('ws');
@@ -121,7 +123,7 @@ class Channel {
 };
 
 class Chat {
-    motd = 'Welcome to the server !';
+    motd = '## Welcome to the server !';
     users = new Set();
     channels = new Map();
     autoadmin = process.argv[3] || '';
@@ -470,10 +472,13 @@ class Protocol {
             
             switch (message[0]) {
                 case 'version':
-                    if ((message[1].protocol === 'ws') && (message[1].version === '1.2'))
+                    if ((message[1].protocol === 'ws') && (message[1].version === '1.3'))
                         this.version.bind(ws)();
                     else
                         this.error.bind(ws)('unrecognized protocol version');
+                    break;
+                case 'ping':
+                    this.pong.bind(ws)();
                     break;
                 case 'ident':
                     chat.identq(user);
@@ -535,6 +540,9 @@ class Protocol {
     };
     version() {
         this.send(JSON.stringify(['version', {'protocol': 'ws', 'version': '1.2'}]));
+    };
+    pong() {
+        this.send(JSON.stringify(['pong']));
     };
     ident(user) {
         this.send(JSON.stringify(['ident', user]));
