@@ -97,11 +97,24 @@
             });
             var ws = { send: () => { error('not connected to any server</span>');} };
             var md = window.markdownit({html: false, xhtmlOut: true, breaks: true, linkify: true, typographer: false});
+            
+            var watchdog = undefined;
+            function setWatchdog() {
+                watchdog = setInterval(() => { send('ping'); }, 5*60*1000);
+            }
+            function clearWatchdog() {
+                clearInterval(watchdog);
+            }
+            function resetWatchdog() {
+                clearWatchdog();
+                setWatchdog();
+            }
 
             function send(command, args=undefined) {
                 data = [command];
                 if (args) data.push(args);
                 ws.send(JSON.stringify(data));
+                resetWatchdog();
             };
 
             function append(text) {
@@ -155,6 +168,9 @@
                     return '<span class="user '+cls+'">'+prefix+sanitize(user.nick||'(undefined)')+' '+userOptionsToString(all)+'</span>';
                 }
             };
+            function motdToString(message) {
+                return md.render(message);
+            };
             function messageToString(message) {
                 let msg =  md.renderInline(message);
                 msg = msg.replace(/@([^@#&!\s]+)/g, (match, p1) => { 
@@ -193,12 +209,15 @@
 
             function connect(host) {
                 ws = new WebSocket(`ws://${host}`);
+                setWatchdog();
                 ws.onmessage = (event) => {
                     try {
                         //console.log(event.data);
                         let message = JSON.parse(event.data);
                         switch (message[0]) {
                             case 'version':
+                                break;
+                            case 'pong':
                                 break;
                             case 'ident':
                             myself = message[1];
@@ -326,7 +345,7 @@
                     + '<tr><td style="vertical-align:top">a&nbsp;:</td><td><i>admin</i>. server administrator, better not mess with them</td></tr>'
                     + '<tr><td style="vertical-align:top">b&nbsp;:</td><td><i>bot</i>. complacency flag to signal a user is a bot</td></tr>'
                     + '</table></p>'
-                    + '<p>You can use <a href="https://commonmark.org/help/" taget="_blank">Markdown</a> to format messages</p>'
+                    + '<p>You can use <a href="https://commonmark.org/help/" target="_blank">Markdown</a> to format messages</p>'
                     + '</span>')
             }
 
