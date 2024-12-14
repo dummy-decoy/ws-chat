@@ -150,12 +150,31 @@
                 hour12: false
             });
             var ws = { send: () => { error(general, 'not connected to any server');} };
-            var md = window.markdownit({html: false, xhtmlOut: true, breaks: true, linkify: true, typographer: false});
+            var md = window.markdownit({
+                html: false, 
+                xhtmlOut: true, 
+                breaks: true, 
+                linkify: true, 
+                typographer: false
+            });
+
+            var watchdog = undefined;
+            function setWatchdog() {
+                watchdog = setInterval(() => { send('ping'); }, 5*60*1000);
+            }
+            function clearWatchdog() {
+                clearInterval(watchdog);
+            }
+            function resetWatchdog() {
+                clearWatchdog();
+                setWatchdog();
+            }
 
             function send(command, args=undefined) {
                 data = [command];
                 if (args) data.push(args);
                 ws.send(JSON.stringify(data));
+                resetWatchdog();
             };
 
             function append(window, text) {
@@ -210,6 +229,9 @@
                     prefix = !!all.bot?'!':'@';
                     return '<span class="user '+cls+'">'+prefix+sanitize(user.nick||'(undefined)')+' '+userOptionsToString(all)+'</span>';
                 }
+            };
+            function motdToString(message) {
+                return md.render(message);
             };
             function messageToString(message) {
                 let msg =  md.renderInline(message);
@@ -362,6 +384,7 @@
 
             function connect(host) {
                 ws = new WebSocket(`ws://${host}`);
+                setWatchdog();
                 addServer(ws.url);
                 ws.onmessage = (event) => {
                     try {
@@ -370,12 +393,14 @@
                         switch (message[0]) {
                             case 'version':
                                 break;
+                            case 'pong':
+                                break;
                             case 'ident':
                                 myself = message[1];
                                 wall(general, `you are identified as ${identToString(message[1])}`);
                                 break;
                             case 'motd':
-                                wall(general, `${messageToString(message[1].content).replace('\n','<br/>')}`);
+                                wall(general, `${motdToString(message[1].content).replace('\n','<br/>')}`);
                                 break;
                             case 'time':
                                 wall(general, `the time on the server is ${sanitize(message[1].local)}`);
