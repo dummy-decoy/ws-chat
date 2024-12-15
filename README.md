@@ -22,8 +22,9 @@ You can now open a browser and browse to the url of the server, the server will 
 
 Command help:
 
-> **/help** : show the help message  
-> **/connect \<host:port>** : connect to a chat server  
+> **/help** : show the help message
+> **/connect** : connect to the chat server at this location  
+> **/connect \<host:port>** : connect to a chat server at the specified location  
 > **/ident** : ask for your own identification string  
 > **/motd** : display the server message of the day  
 > **/motd \<message>** : set the server message of the day (requires: admin)  
