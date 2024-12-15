@@ -96,7 +96,13 @@
                 hour12: false
             });
             var ws = { send: () => { error('not connected to any server</span>');} };
-            var md = window.markdownit({html: false, xhtmlOut: true, breaks: true, linkify: true, typographer: false});
+            var md = window.markdownit({
+                html: false, 
+                xhtmlOut: true, 
+                breaks: true, 
+                linkify: true, 
+                typographer: false
+            });
             
             var watchdog = undefined;
             function setWatchdog() {
@@ -207,7 +213,9 @@
                 document.getElementById("message").focus();
             };
 
-            function connect(host) {
+            function connect(host=undefined) {
+                if (typeof host === 'undefined')
+                    host = window.location.host+window.location.pathname;
                 ws = new WebSocket(`ws://${host}`);
                 setWatchdog();
                 ws.onmessage = (event) => {
@@ -307,7 +315,8 @@
                     + '<p>This is ws-chat (tentative name), an IRC like chat running in your browser.</p>'
                     + '<p>command help:<table>'
                     + '<tr><td style="vertical-align:top">/help</td><td>show this help message</td></tr>'
-                    + '<tr><td style="vertical-align:top">/connect&nbsp;&lt;host:port&gt;</td><td>connect to a chat server</td></tr>'
+                    + '<tr><td style="vertical-align:top">/connect</td><td>connect to the chat server at this location</td></tr>'
+                    + '<tr><td style="vertical-align:top">/connect&nbsp;&lt;host:port&gt;</td><td>connect to a chat server at the specified location</td></tr>'
                     + '<tr><td style="vertical-align:top">/ident</td><td>ask for your own identification string</td></tr>'
                     + '<tr><td style="vertical-align:top">/motd</td><td>display the server message of the day</td></tr>'
                     + '<tr><td style="vertical-align:top">/motd&nbsp;&lt;message&gt;</td><td>set the server message of the day (requires: admin)</td></tr>'
@@ -371,6 +380,8 @@
                 let command = input.value.trimEnd();
                 if (command == '/help') {
                     help();
+                } else if (command.startsWith('/connect')) {
+                    connect();
                 } else if (command.startsWith('/connect ')) {
                     args = split(command, 1);
                     if (args.length > 2) error('/connect: too many arguments');
@@ -512,6 +523,7 @@
             window.onload = () => {
                 content = document.getElementById('content');
                 help();
+                connect();
             }
         </script>
     </head>
