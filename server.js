@@ -123,7 +123,7 @@ class Channel {
 };
 
 class Chat {
-    motd = '## Welcome to the server !';
+    motd = '## Welcome to the server !\nPlease choose your _/nick_ first, then read the _/help_ above. Create a _#channel_ by _/join_ -ing it, and **have fun** !';
     users = new Set();
     channels = new Map();
     autoadmin = process.argv[3] || '';
@@ -640,7 +640,10 @@ wss.on('connection', function (ws,req) {
         protocol.message(this, data);
     });
 
-    ws.host = req.socket.remoteAddress;
+    if ('x-forwarded-for' in req.headers)
+        ws.host = req.headers['x-forwarded-for'].split(/\s*,\s*/)[0];
+    else
+        ws.host = req.socket.remoteAddress;
     ws.port = req.socket.remotePort;
     protocol.connect(ws);
 });
