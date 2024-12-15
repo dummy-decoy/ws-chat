@@ -71,6 +71,28 @@
                 var snd = new Audio('data:audio/wav;base64,UklGRsIBAABXQVZFZm10IBIAAAAHAAEAQB8AAEAfAAABAAgAAABmYWN0BAAAAJABAABkYXRhkAEAALKanZudmyoaHRwcIJydm56ZuRkeGh4ZuJmdm52dIRwcHRopmp6anpl+GR4aHhqqmp2cnKEdHRsdGTiZnpqemTgZHRsdHaGcnJ2aqhoeGh4Z/5memp6aKhodHBwhnZ2bnZm4GR4aHhm4mZ2bnZ0hHBwdGiqanpqemX8ZHhoeGqqanZycoR0dGx0ZOJmemp6ZOBkdGx0doZycnZqqGh4aHhn/mZ6anpoqGh0cHCGdnZudmbgZHhoeGbiZnZudnSEcHB0aKpqemp6Z/xkeGh4aqpqdnJyhHR0bHRk4mZ6anpk4GR0bHR2hnJydmqoaHhoeGf+ZnpqemioaHRwcIZ2dm52ZuBkeGh4ZuJmdm52dIRwcHRoqmp6anpn/GR4aHhqqmp2cnKEdHRsdGTiZnpqemTgZHRsdHaGcnJ2aqhoeGh4Zf5memp6aKhodHBwhnZ2bnZm4GR4aHhm4mZ2bnZ0hHBwdGiqanpqemf4ZHhoeGqmanZycoR0dGx0ZOJmemp6ZORkeGx0coJycnZqqGx0bHRo=');
                 snd.play();
             }
+
+            function allowNotifications() {
+                if (typeof Notification !== "undefined") {
+                    if ((Notification.permission !== "granted") && (Notification.permission !== "denied")) {
+                        if (window.confirm('ws-chat would like to display notifications. configure notification ?'))
+                            Notification.requestPermission().then((permission) => {});
+                    }
+                }
+            }
+            function notify(text) {
+                if (!document.hasFocus() && (typeof Notification !== "undefined") && (Notification.permission === "granted")) {
+                    var tmp = document.createElement('span');
+                    tmp.innerHTML = text;
+                    text = tmp.textContent || tmp.innerText;
+
+                    var notification = new Notification('ws-chat', {'body': text, 'tag': 'ws-chat'});
+                    notification.onclick = () => {
+                            notification.close();
+                            window.parent.focus();
+                    }
+                }
+            }
             
             function sanitize(string) {
                 const map = {
@@ -129,12 +151,19 @@
             }
             function wall(text) {
                 append('<span class="wall">'+text+'</span>');
+                notify(window.title, text);
             }
             function error(text) {
                 append('<span class="error">'+text+'</span>');
+                notify(window.title, text);
             }
             function info(text) {
                 append('<span class="info">'+text+'</span>');
+                notify(window.title, text);
+            }
+            function notice(text) {
+                append(text);
+                notify(text);
             }
             
             function channelOptionsToString(options) {
@@ -240,11 +269,11 @@
                             case 'nick':
                                 if (!('old' in message[1]) || !('channel' in message[1])) {
                                     myself = message[1].new;
-                                    append(`you are now known as ${userToString(message[1].new)}`);
+                                    notice(`you are now known as ${userToString(message[1].new)}`);
                                 } else if ('channel' in message[1]) {
-                                    append(`${channelToString(message[1].channel)}: ${userToString(message[1].old)} changed name to ${userToString(message[1].new)}`);
+                                    notice(`${channelToString(message[1].channel)}: ${userToString(message[1].old)} changed name to ${userToString(message[1].new)}`);
                                 } else {
-                                    append(`${userToString(message[1].old)} changed name to ${userToString(message[1].new)}`);
+                                    notice(`${userToString(message[1].old)} changed name to ${userToString(message[1].new)}`);
                                 }
                                 break;
                             case 'list':
@@ -255,7 +284,7 @@
                                 break;
                             case 'users':
                                 if (message[1].channel) {
-                                    append(`${channelToString(message[1].channel)}: user list:<br>&emsp;${message[1].users.map(([user,options])=>userToString(user, options)+' ('+identToString(user)+')').join('<br>&emsp;')}`);
+                                    notice(`${channelToString(message[1].channel)}: user list:<br>&emsp;${message[1].users.map(([user,options])=>userToString(user, options)+' ('+identToString(user)+')').join('<br>&emsp;')}`);
                                 } else if (message[1].pattern) {
                                     wall(`users matching ${patternToString(message[1].pattern)}:<br>&emsp;${message[1].match.map(([user,options,channels])=>userToString(user, options)+' ('+identToString(user)+') '+channels.map(([channel, options])=>channelToString(channel)+userOptionsToString(options)).join(' ')).join('<br>&emsp;')}`);
                                 } else {
@@ -263,38 +292,38 @@
                                 }
                                 break;
                             case 'join':
-                                append(`${channelToString(message[1].channel)}: ${userToString(message[1].user, message[1].options)} joined the channel`);
+                                notice(`${channelToString(message[1].channel)}: ${userToString(message[1].user, message[1].options)} joined the channel`);
                                 break;
                             case 'topic':
                                 if (message[1].value)
-                                    append(`${channelToString(message[1].channel)}: topic was set to "<span class="topic">${sanitize(message[1].value)}</span>"`);
+                                    notice(`${channelToString(message[1].channel)}: topic was set to "<span class="topic">${sanitize(message[1].value)}</span>"`);
                                 else
-                                    append(`${channelToString(message[1].channel)}: topic was not set`);
+                                    notice(`${channelToString(message[1].channel)}: topic was not set`);
                                 break;
                             case 'msg':
                                 if ('channel' in message[1]) {
-                                    append(`${channelToString(message[1].channel)}: ${userToString(message[1].from)}: ${messageToString(message[1].content)}`);
+                                    notice(`${channelToString(message[1].channel)}: ${userToString(message[1].from)}: ${messageToString(message[1].content)}`);
                                 } else {
                                     if (message[1].from.url != myself.url) beep();
-                                    append(`${userToString(message[1].from)}: ${userToString(message[1].user)}: ${messageToString(message[1].content)}`);
+                                    notice(`${userToString(message[1].from)}: ${userToString(message[1].user)}: ${messageToString(message[1].content)}`);
                                 }
                                 break;
                             case 'leave':
-                                append(`${channelToString(message[1].channel)}: ${userToString(message[1].user)} left the channel (${sanitize(message[1].reason||'no reason')})`);
+                                notice(`${channelToString(message[1].channel)}: ${userToString(message[1].user)} left the channel (${sanitize(message[1].reason||'no reason')})`);
                                 break;
                             case 'mode':
                                 if ('channel' in message[1]) {
                                     if ('user' in message[1]) {
-                                        append(`${channelToString(message[1].channel)}: user mode for ${userToString(message[1].user)} is ${userOptionstoString(message[1].options)||'(-)'}`);
+                                        notice(`${channelToString(message[1].channel)}: user mode for ${userToString(message[1].user)} is ${userOptionstoString(message[1].options)||'(-)'}`);
                                     } else {
-                                        append(`${channelToString(message[1].channel)}: channel mode is${channelOptionsToString(message[1].options)}`);
+                                        notice(`${channelToString(message[1].channel)}: channel mode is${channelOptionsToString(message[1].options)}`);
                                     }
                                 } else if ('user' in message[1]) {
                                     wall(`user mode for ${userToString(message[1].user)} is ${userOptionstoString(message[1].options)||'(-)'}`);
                                 }
                                 break;
                             case 'kick':
-                                append(`${channelToString(message[1].channel)}: ${userToString(message[1].user)} was kicked out of the channel (${sanitize(message[1].reason||'no reason')})`);
+                                notice(`${channelToString(message[1].channel)}: ${userToString(message[1].user)} was kicked out of the channel (${sanitize(message[1].reason||'no reason')})`);
                                 break;
                             case 'wall':
                                 wall(`${userToString(message[1].from)}: ${messageToString(message[1].content)}`);
@@ -524,7 +553,7 @@
                 content = document.getElementById('content');
                 help();
                 connect();
-            }
+                allowNotifications();
         </script>
     </head>
     <body>
