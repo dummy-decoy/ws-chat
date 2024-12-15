@@ -1,7 +1,7 @@
 # ws-chat
 An IRC like online chat running in your web browser using WebSockets
 
-**A live demo is accessible here: [http://stochastique.io/ws-chat/](http://stochastique.io/ws-chat/)**
+**A live demo is accessible here: [https://stochastique.io/ws-chat/](https://stochastique.io/ws-chat/)**
 
 ## Running the chat server
 
