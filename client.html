@@ -78,6 +78,28 @@
                 snd.play();
             }
 
+            function allowNotifications() {
+                if (typeof Notification !== "undefined") {
+                    if ((Notification.permission !== "granted") && (Notification.permission !== "denied")) {
+                        if (window.confirm('ws-chat would like to display notifications. configure notification ?'))
+                            Notification.requestPermission().then((permission) => {});
+                    }
+                }
+            }
+            function notify(title, text) {
+                if (!document.hasFocus() && (typeof Notification !== "undefined") && (Notification.permission === "granted")) {
+                    var tmp = document.createElement('span');
+                    tmp.innerHTML = text;
+                    text = tmp.textContent || tmp.innerText;
+
+                    var notification = new Notification('ws-chat', {'body': text, 'tag': window.title});
+                    notification.onclick = () => {
+                            notification.close();
+                            window.parent.focus();
+                    }
+                }
+            }
+
             function sanitize(string) {
                 const map = {
                     '&': '&amp;',
@@ -185,12 +207,19 @@
             }
             function wall(window, text) {
                 append(window, '<span class="wall">'+text+'</span>');
+                notify(window.title, text);
             }
             function error(window, text) {
                 append(window, '<span class="error">'+text+'</span>');
+                notify(window.title, text);
             }
             function info(window, text) {
                 append(window, '<span class="info">'+text+'</span>');
+                notify(window.title, text);
+            }
+            function notice(window, text) {
+                append(window, text);
+                notify(window.title, text);
             }
 
             function channelOptionsToString(options) {
@@ -410,12 +439,12 @@
                             case 'nick':
                                 if (!('old' in message[1]) || !('channel' in message[1])) {
                                     myself = message[1].new;
-                                    append(general, `you are now known as ${userToString(message[1].new)}`);
+                                    notice(general, `you are now known as ${userToString(message[1].new)}`);
                                 } else if ('channel' in message[1]) {
                                     updateUser(message[1].channel, message[1].new);
-                                    append(getChannelWindow(message[1].channel)||general, `${channelToString(message[1].channel)}: ${userToString(message[1].old)} changed name to ${userToString(message[1].new)}`);
+                                    notice(getChannelWindow(message[1].channel)||general, `${channelToString(message[1].channel)}: ${userToString(message[1].old)} changed name to ${userToString(message[1].new)}`);
                                 } else {
-                                    append(general, `${userToString(message[1].old)} changed name to ${userToString(message[1].new)}`);
+                                    notice(general, `${userToString(message[1].old)} changed name to ${userToString(message[1].new)}`);
                                 }
                                 break;
                             case 'list':
@@ -426,7 +455,7 @@
                                 break;
                             case 'users':
                                 if (message[1].channel) {
-                                    append(getChannelWindow(message[1].channel)||general, `${channelToString(message[1].channel)}: user list:<br>&emsp;${message[1].users.map(([user,options])=>userToString(user, options)+' ('+identToString(user)+')').join('<br>&emsp;')}`);
+                                    notice(getChannelWindow(message[1].channel)||general, `${channelToString(message[1].channel)}: user list:<br>&emsp;${message[1].users.map(([user,options])=>userToString(user, options)+' ('+identToString(user)+')').join('<br>&emsp;')}`);
                                     removeAllUsers(message[1].channel);
                                     for (let [user, options] of message[1].users) addUser(message[1].channel, user, options);
                                 } else if (message[1].pattern) {
@@ -438,20 +467,20 @@
                             case 'join':
                                 subwindow = createChannelWindow(message[1].channel);
                                 addUser(message[1].channel, message[1].user, {...message[1].user.options, ...message[1].options});
-                                append(subwindow, `${channelToString(message[1].channel)}: ${userToString(message[1].user, message[1].options)} joined the channel`);
+                                notice(subwindow, `${channelToString(message[1].channel)}: ${userToString(message[1].user, message[1].options)} joined the channel`);
                                 break;
                             case 'topic':
                                 if (message[1].value)
-                                    append(getChannelWindow(message[1].channel)||general, `${channelToString(message[1].channel)}: topic was set to "<span class="topic">${sanitize(message[1].value)}</span>"`);
+                                    notice(getChannelWindow(message[1].channel)||general, `${channelToString(message[1].channel)}: topic was set to "<span class="topic">${sanitize(message[1].value)}</span>"`);
                                 else
-                                    append(getChannelWindow(message[1].channel)||general, `${channelToString(message[1].channel)}: topic was not set`);
+                                    notice(getChannelWindow(message[1].channel)||general, `${channelToString(message[1].channel)}: topic was not set`);
                                 break;
                             case 'msg':
                                 if ('channel' in message[1]) {
-                                    append(getChannelWindow(message[1].channel)||general, `${channelToString(message[1].channel)}: ${userToString(message[1].from)}: ${messageToString(message[1].content)}`);
+                                    notice(getChannelWindow(message[1].channel)||general, `${channelToString(message[1].channel)}: ${userToString(message[1].from)}: ${messageToString(message[1].content)}`);
                                 } else {
                                     subwindow = createUserWindow(message[1].from, message[1].user);
-                                    append(subwindow, `${userToString(message[1].from)}: ${userToString(message[1].user)}: ${messageToString(message[1].content)}`);
+                                    notice(subwindow, `${userToString(message[1].from)}: ${userToString(message[1].user)}: ${messageToString(message[1].content)}`);
                                 }
                                 break;
                             case 'leave':
@@ -459,15 +488,15 @@
                                     removeAllUsers(message[1].channel);
                                 else
                                     removeUser(message[1].channel, message[1].user);
-                                append(getChannelWindow(message[1].channel), `${channelToString(message[1].channel)}: ${userToString(message[1].user)} left the channel (${sanitize(message[1].reason||'no reason')})`);
+                                notice(getChannelWindow(message[1].channel), `${channelToString(message[1].channel)}: ${userToString(message[1].user)} left the channel (${sanitize(message[1].reason||'no reason')})`);
                                 break;
                             case 'mode':
                                 if ('channel' in message[1]) {
                                     if ('user' in message[1]) {
-                                        append(getChannelWindow(message[1].channel)||general, `${channelToString(message[1].channel)}: user mode for ${userToString(message[1].user)} is ${userOptionsToString(message[1].options)||'(-)'}`);
+                                        notice(getChannelWindow(message[1].channel)||general, `${channelToString(message[1].channel)}: user mode for ${userToString(message[1].user)} is ${userOptionsToString(message[1].options)||'(-)'}`);
                                         updateUser(message[1].channel, message[1].user, {...message[1].user.options, ...message[1].options});
                                     } else {
-                                        append(getChannelWindow(message[1].channel)||general, `${channelToString(message[1].channel)}: channel mode is${channelOptionsToString(message[1].options)}`);
+                                        notice(getChannelWindow(message[1].channel)||general, `${channelToString(message[1].channel)}: channel mode is${channelOptionsToString(message[1].options)}`);
                                     }
                                 } else if ('user' in message[1]) {
                                     wall(general, `user mode for ${userToString(message[1].user)} is ${userOptionsToString(message[1].options)||'(-)'}`);
@@ -478,7 +507,7 @@
                                     removeAllUsers(message[1].channel);
                                 else
                                     removeUser(message[1].channel, message[1].user); 
-                                append(getChannelWindow(message[1].channel)||general, `${channelToString(message[1].channel)}: ${userToString(message[1].user)} was kicked out of the channel (${sanitize(message[1].reason||'no reason')})`);
+                                notice(getChannelWindow(message[1].channel)||general, `${channelToString(message[1].channel)}: ${userToString(message[1].user)} was kicked out of the channel (${sanitize(message[1].reason||'no reason')})`);
                                 break;
                             case 'wall':
                                 wall(general, `${userToString(message[1].from)}: ${messageToString(message[1].content)}`);
@@ -715,6 +744,7 @@
             }
             help();
             connect();
+            allowNotifications();
         </script>
     </body>
 </html>
